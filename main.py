@@ -1,82 +1,136 @@
 import random
+from pathlib import Path
 
 import pygame
-import os
 import sys
 
-
-def load_image(name):
-    fullname = os.path.join('data', name)
-    if not os.path.isfile(fullname):
-        print(f"Файл с изображением '{fullname}' не найден")
-        sys.exit()
-    image = pygame.image.load(fullname)
-    return image
+FPS = 60
+SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
 
 
-class Alien(pygame.sprite.Sprite):
-    image_alien = load_image('alien2.png')
+def terminate():
+    pygame.quit()
+    sys.exit()
 
-    def __init__(self):
-        super().__init__(all_sprites)
-        self.image = self.image_alien.convert_alpha()
+
+class FileManager:
+    DATA_PATH = Path.cwd() / 'data'
+
+    SPRITES_PATH = DATA_PATH / 'sprites'
+
+    @staticmethod
+    def load_image(name, colorkey=None):
+        path = FileManager.SPRITES_PATH / name
+        if not path.exists():
+            raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
+
+        image = pygame.image.load(path)
+        if colorkey is not None:
+            image = image.convert()
+            image.set_colorkey(image.get_at((0, 0)) if colorkey == -1 else colorkey)
+        else:
+            image = image.convert_alpha()
+        return image
+
+
+class SWSprite(pygame.sprite.Sprite):
+    image_name = None
+
+    def __init__(self, image_name: str | None, *groups: pygame.sprite.Group):
+        if image_name is None:
+            if self.image_name is None:
+                raise TypeError(f"{type(self)}.__init__() missing 1 required positional argument: 'image_name'")
+            image_name = self.image_name
+
+        super().__init__(*groups)
+        self.image = FileManager.load_image(image_name)
         self.rect = self.image.get_rect()
-        self.rect.x = random.randrange(1050 - self.rect.width)
-        self.rect.y = random.randrange(-100, -30)
+
+    def pos(self): return self.rect.topleft()
+    def size(self): return self.rect.size
+
+    def move(self, x, y): self.rect = self.rect.move(x, y)
+    def set_pos(self, x, y): self.rect.topleft = x, y
+
+
+class Alien(SWSprite):
+    image_name = 'alien2.png'
+
+    def __init__(self, *groups):
+        super().__init__(None, *groups)
+        self.speed = ...
+        self.to_start()
+
+    def to_start(self):
+        x = random.randrange(SCREEN_WIDTH - self.rect.width)
+        y = random.randrange(-100, -30)
+        self.set_pos(x, y)
         self.speed = random.randrange(1, 9)
 
     def update(self):
-        self.rect.y += self.speed
-        if self.rect.top > 1010 or self.rect.left < -30 or self.rect.right > 750:
-            self.rect.x = random.randrange(1050 - self.rect.width)
-            self.rect.y = random.randrange(-100, -30)
-            self.speed = random.randrange(1, 9)
+        self.move(0, self.speed)
+        if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
+            self.to_start()
 
 
-class Player(pygame.sprite.Sprite):
-    image_player = load_image("spaceX.png")
+class Player(SWSprite):
+    image_name = "spaceX.png"
 
-    def __init__(self):
-        super().__init__(all_sprites)
-        self.image = self.image_player.convert_alpha()
-        self.rect = self.image.get_rect()
-        self.rect.centerx = 750 / 2
-        self.rect.bottom = 1015
-        self.speed = 0
+    def __init__(self, *groups):
+        super().__init__(None, *groups)
+        self.speed = 8
+        self.rect.centerx = SCREEN_WIDTH / 2
+        self.rect.bottom = SCREEN_HEIGHT - self.speed
 
     def update(self):
-        self.speed = 0
+        speed = self.speed  # 8 or 5.656854249492381
         keystate = pygame.key.get_pressed()
-        if keystate[pygame.K_a]:
-            self.speed = -8
-        if keystate[pygame.K_d]:
-            self.speed = 8
-        self.rect.x += self.speed
-        if self.rect.right > 780:
-            self.rect.right = 780
-        if self.rect.left < -30:
-            self.rect.left = -30
+        if any((keystate[pygame.K_w], keystate[pygame.K_a], keystate[pygame.K_s], keystate[pygame.K_d])):
+            direction = [0, 0]
+            if keystate[pygame.K_a]:
+                direction[0] = -1
+            elif keystate[pygame.K_d]:
+                direction[0] = 1
+            if keystate[pygame.K_w]:
+                direction[1] = -1
+            elif keystate[pygame.K_s]:
+                direction[1] = 1
+
+            if all(direction):
+                speed = (speed ** 2 / 2) ** 0.5
+
+            rect_check = self.rect.move(*(d * speed for d in direction))
+            if rect_check.left <= 0 or rect_check.right >= SCREEN_WIDTH:
+                direction[0] = 0
+            if rect_check.left <= 0 or rect_check.bottom >= SCREEN_HEIGHT:
+                direction[1] = 0
+
+            self.move(*(d * speed for d in direction))
 
 
-if __name__ == '__main__':
+def main():
     pygame.init()
-    FPS = 60
-    size = width, height = 750, 1000
-    screen = pygame.display.set_mode(size)
+    screen = pygame.display.set_mode(SCREEN_SIZE)
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     all_sprites = pygame.sprite.Group()
-    player = Player()
+
+    player = Player(all_sprites)
     for i in range(8):
-        alien = Alien()
-    running = True
-    while running:
-        screen.fill((0, 0, 0))
+        Alien(all_sprites)
+
+    while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                terminate()
+            if event.type == pygame.KEYDOWN:
+                player.update()
+        screen.fill('black')
         all_sprites.update()
         all_sprites.draw(screen)
         clock.tick(FPS)
         pygame.display.flip()
-    pygame.quit()
+
+
+if __name__ == '__main__':
+    main()
