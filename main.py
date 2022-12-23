@@ -7,6 +7,9 @@ import sys
 FPS = 60
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
 BLACK = pygame.Color('black')
+all_sprites = pygame.sprite.Group()
+alien = pygame.sprite.Group()
+bullets = pygame.sprite.Group()
 
 
 def terminate():
@@ -80,6 +83,27 @@ class Alien(SWSprite):
             self.to_start()
 
 
+class Bullet(SWSprite):
+    image_name = "bullet.png"
+
+    def __init__(self, x, y, *groups):
+        super().__init__(None, *groups)
+        self.rect.bottom = y
+        self.rect.centerx = x
+        self.speed = -10
+        self.to_start()
+
+    def to_start(self):
+        x = self.rect.centerx - 7
+        y = self.rect.bottom
+        self.set_pos(x, y)
+
+    def update(self):
+        self.move(0, self.speed)
+        if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
+            self.kill()
+
+
 class Player(SWSprite):
     image_name = "spaceX.png"
 
@@ -115,26 +139,30 @@ class Player(SWSprite):
                 direction[1] = 0
             self.move(*(d * speed for d in direction))
 
+    def shoot(self):
+        Bullet(self.rect.centerx, self.rect.top, all_sprites, bullets)
+
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    all_sprites = pygame.sprite.Group()
-
     player = Player(all_sprites)
     for i in range(8):
         Alien(all_sprites)
-
+        Alien(alien)
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
             if event.type == pygame.KEYDOWN:
                 player.update()
-        screen.fill(BLACK)
+                if event.key == pygame.K_SPACE:
+                    player.shoot()
         all_sprites.update()
+        pygame.sprite.groupcollide(alien, bullets, True, True)
+        screen.fill(BLACK)
         all_sprites.draw(screen)
         clock.tick(FPS)
         pygame.display.flip()
