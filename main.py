@@ -111,7 +111,8 @@ class Player(SWSprite):
                 direction[0] = 0
             if rect_check.left <= 0 or rect_check.bottom >= SCREEN_HEIGHT:
                 direction[1] = 0
-
+            if rect_check.top <= 0:
+                direction[1] = 0
             self.move(*(d * speed for d in direction))
 
 
