@@ -147,10 +147,8 @@ def main():
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     player = Player(all_sprites)
-
-    for _ in range(8):
+    for i in range(8):
         Alien(all_sprites, alien)
-
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -160,7 +158,9 @@ def main():
                 if event.key == pygame.K_SPACE:
                     player.shoot()
         all_sprites.update()
-        pygame.sprite.groupcollide(alien, bullets, True, True)
+        s = pygame.sprite.groupcollide(alien, bullets, True, True)
+        for i in s:
+            Alien(all_sprites, alien)
         screen.fill(BLACK)
         all_sprites.draw(screen)
         clock.tick(FPS)
