@@ -5,6 +5,7 @@ import pygame
 import sys
 
 FPS = 60
+SCORE = 0
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
 BLACK = pygame.Color('black')
 all_sprites = pygame.sprite.Group()
@@ -141,7 +142,15 @@ class Player(SWSprite):
         Bullet(self.rect.centerx, self.rect.top, all_sprites, bullets)
 
 
+def draw_text(screen, score, size, pos):
+    pygame.font.init()
+    font = pygame.font.SysFont('SPACE MISSION', size)
+    text = font.render(str(score), True, (0, 255, 0))
+    screen.blit(text, pos)
+
+
 def main():
+    global SCORE
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     pygame.display.set_caption("Space War")
@@ -155,14 +164,17 @@ def main():
                 terminate()
             if event.type == pygame.KEYDOWN:
                 player.update()
-                if event.key == pygame.K_SPACE:
-                    player.shoot()
+            if pygame.key.get_pressed()[pygame.K_SPACE]:
+                player.shoot()
         all_sprites.update()
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
         for i in s:
+            SCORE += 10
             Alien(all_sprites, alien)
         screen.fill(BLACK)
         all_sprites.draw(screen)
+        draw_text(screen, "Очки: ", 40, (SCREEN_WIDTH / 2 - 50, 10))
+        draw_text(screen, SCORE, 40, (SCREEN_WIDTH / 2 + 50, 10))
         clock.tick(FPS)
         pygame.display.flip()
 
