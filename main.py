@@ -6,6 +6,7 @@ import sys
 
 FPS = 60
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
+BLACK = pygame.Color('black')
 
 
 def terminate():
@@ -46,11 +47,17 @@ class SWSprite(pygame.sprite.Sprite):
         self.image = FileManager.load_image(image_name)
         self.rect = self.image.get_rect()
 
-    def pos(self): return self.rect.topleft()
-    def size(self): return self.rect.size
+    def pos(self):
+        return self.rect.topleft()
 
-    def move(self, x, y): self.rect = self.rect.move(x, y)
-    def set_pos(self, x, y): self.rect.topleft = x, y
+    def size(self):
+        return self.rect.size
+
+    def move(self, x, y):
+        self.rect = self.rect.move(x, y)
+
+    def set_pos(self, x, y):
+        self.rect.topleft = x, y
 
 
 class Alien(SWSprite):
@@ -125,7 +132,7 @@ def main():
                 terminate()
             if event.type == pygame.KEYDOWN:
                 player.update()
-        screen.fill('black')
+        screen.fill(BLACK)
         all_sprites.update()
         all_sprites.draw(screen)
         clock.tick(FPS)
