@@ -58,7 +58,7 @@ class Alien(SWSprite):
 
     def __init__(self, *groups):
         super().__init__(None, *groups)
-        self.speed = ...
+        self.speed = None
         self.to_start()
 
     def to_start(self):
