@@ -147,9 +147,10 @@ def main():
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     player = Player(all_sprites)
-    for i in range(8):
-        Alien(all_sprites)
-        Alien(alien)
+
+    for _ in range(8):
+        Alien(all_sprites, alien)
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
