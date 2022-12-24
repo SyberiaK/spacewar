@@ -39,20 +39,20 @@ def start_screen(WIDTH, HEIGHT):
     fps = 10
     pygame.font.init()
     space_war = ['Space War']
-    intro_text = ['Для начала игры нажмите любую клавишу']
+    intro_text = ['Для начала игры нажмите Enter']
     scr = pygame.display.set_mode((WIDTH, HEIGHT))
     pygame.display.set_caption("Space War")
     font_start = pygame.font.SysFont('SPACE MISSION', 65)
     font_intro = pygame.font.SysFont('SPACE MISSION', 40)
     d = FileManager.load_gif_frames('start.gif')
     AnimatedSprite(d)
-    running = True
-    while running:
+
+    while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
-                running = False
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                return
         start_screen_sprite.update()
         start_screen_sprite.draw(scr)
         for i in space_war:
