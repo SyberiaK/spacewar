@@ -38,20 +38,19 @@ class FileManager:
 
 
 class SWSprite(pygame.sprite.Sprite):
-    image_name = None
-
-    def __init__(self, image_name: str | None, *groups: pygame.sprite.Group):
-        if image_name is None:
-            if self.image_name is None:
-                raise TypeError(f"{type(self)}.__init__() missing 1 required positional argument: 'image_name'")
-            image_name = self.image_name
-
+    def __init__(self, image_name: str, *groups: pygame.sprite.Group):
         super().__init__(*groups)
         self.image = FileManager.load_image(image_name)
         self.rect = self.image.get_rect()
 
+    def change_image(self, image_name: str):
+        self.image = FileManager.load_image(image_name)
+        pos = self.pos()
+        self.rect = self.image.get_rect()
+        self.set_pos(*pos)
+
     def pos(self):
-        return self.rect.topleft()
+        return self.rect.topleft
 
     def size(self):
         return self.rect.size
@@ -64,21 +63,27 @@ class SWSprite(pygame.sprite.Sprite):
 
 
 class Alien(SWSprite):
-    image_name = 'alien2.png'
+    image_variants = 'alien2.png', 'alien3.png'
 
     def __init__(self, *groups):
-        super().__init__(None, *groups)
+        image_name = random.choice(self.image_variants)
+
+        super().__init__(image_name, *groups)
         self.speed = None
+        self.direction = [0.0, 1.0]
         self.to_start()
 
     def to_start(self):
+        image_name = random.choice(self.image_variants)
+        self.change_image(image_name)
+
         x = random.randrange(SCREEN_WIDTH - self.rect.width)
         y = random.randrange(-100, -30)
         self.set_pos(x, y)
         self.speed = random.randrange(1, 9)
 
     def update(self):
-        self.move(0, self.speed)
+        self.move(*(d * self.speed for d in self.direction))
         if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
             self.to_start()
 
@@ -87,7 +92,7 @@ class Bullet(SWSprite):
     image_name = "bullet.png"
 
     def __init__(self, x, y, *groups):
-        super().__init__(None, *groups)
+        super().__init__(self.image_name, *groups)
         self.rect.bottom = y
         self.rect.centerx = x
         self.speed = -10
@@ -108,7 +113,7 @@ class Player(SWSprite):
     image_name = "spaceX.png"
 
     def __init__(self, *groups):
-        super().__init__(None, *groups)
+        super().__init__(self.image_name, *groups)
         self.speed = 8
         self.rect.centerx = SCREEN_WIDTH / 2
         self.rect.bottom = SCREEN_HEIGHT - self.speed
@@ -167,15 +172,18 @@ def main():
                 player.update()
             if pygame.key.get_pressed()[pygame.K_SPACE]:
                 player.shoot()
+
         all_sprites.update()
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
         for i in s:
             score += 10
             Alien(all_sprites, alien)
+
         screen.fill(BLACK)
         all_sprites.draw(screen)
         draw_text(screen, "Очки: ", 40, (SCREEN_WIDTH / 2 - 50, 10))
         draw_text(screen, score, 40, (SCREEN_WIDTH / 2 + 50, 10))
+
         clock.tick(FPS)
         pygame.display.flip()
 
