@@ -62,6 +62,13 @@ class SWSprite(pygame.sprite.Sprite):
         self.rect.topleft = x, y
 
 
+def spawn_alien(score):
+    if score >= 1000:
+        MobileAlien(all_sprites, alien)
+    else:
+        Alien(all_sprites, alien)
+
+
 class Alien(SWSprite):
     image_variants = 'alien2.png', 'alien3.png'
 
@@ -86,6 +93,12 @@ class Alien(SWSprite):
         self.move(*(d * self.speed for d in self.direction))
         if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
             self.to_start()
+
+
+class MobileAlien(Alien):
+    def to_start(self):
+        super().to_start()
+        self.direction[0] = random.uniform(-1, 1)
 
 
 class Bullet(SWSprite):
@@ -177,7 +190,7 @@ def main():
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
         for i in s:
             score += 10
-            Alien(all_sprites, alien)
+            spawn_alien(score)
 
         screen.fill(BLACK)
         all_sprites.draw(screen)
