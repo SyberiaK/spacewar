@@ -1,7 +1,7 @@
 import os
 import random
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageSequence
 
 import pygame
 import sys
@@ -35,12 +35,12 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.image = self.frames[self.cur_frame]
 
 
-def start_screen(WIDTH, HEIGHT):
+def start_screen(width, height):
     fps = 10
     pygame.font.init()
     space_war = ['Space War']
     intro_text = ['Для начала игры нажмите Enter']
-    scr = pygame.display.set_mode((WIDTH, HEIGHT))
+    scr = pygame.display.set_mode((width, height))
     pygame.display.set_caption("Space War")
     font_start = pygame.font.SysFont('SPACE MISSION', 65)
     font_intro = pygame.font.SysFont('SPACE MISSION', 40)
@@ -85,7 +85,7 @@ class FileManager:
         return image
 
     @staticmethod
-    def load_gif_frames(name: str):
+    def load_gif_frames(name: str, colorkey=None):
         path = FileManager.SPRITES_PATH / name
         if not path.exists():
             raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
@@ -95,12 +95,17 @@ class FileManager:
             raise ValueError(f"Файл '{name}' по пути '{path}' не является анимированным изображением формата GIF")
 
         frames = []
-        for idx in range(gif_image.n_frames):
-            gif_image.seek(idx)
-            frame_rgba = gif_image.convert("RGBA")
-            pygame_image = pygame.image.fromstring(
-                frame_rgba.tobytes(), frame_rgba.size, 'RGBA')
-            frames.append(pygame_image)
+        for frame in ImageSequence.Iterator(gif_image):
+            frame = frame.convert('RGBA')
+            pygame_frame = pygame.image.fromstring(frame.tobytes(), frame.size, frame.mode)
+
+            if colorkey is not None:
+                pygame_frame = pygame_frame.convert()
+                pygame_frame.set_colorkey(pygame_frame.get_at((0, 0)) if colorkey == -1 else colorkey)
+            else:
+                pygame_frame = pygame_frame.convert_alpha()
+
+            frames.append(pygame_frame)
         return frames
 
 
