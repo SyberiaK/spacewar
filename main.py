@@ -60,7 +60,7 @@ def start_screen(WIDTH, HEIGHT):
             scr.blit(string_rendered, (335, 7))
         for i in intro_text:
             string_rendered = font_intro.render(i, True, pygame.Color('Aqua'))
-            scr.blit(string_rendered, (170, 460))
+            scr.blit(string_rendered, (230, 460))
         clock.tick(fps)
         pygame.display.flip()
 
