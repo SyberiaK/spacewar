@@ -5,7 +5,6 @@ import pygame
 import sys
 
 FPS = 60
-SCORE = 0
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
 BLACK = pygame.Color('black')
 all_sprites = pygame.sprite.Group()
@@ -150,14 +149,16 @@ def draw_text(screen, score, size, pos):
 
 
 def main():
-    global SCORE
     pygame.init()
     screen = pygame.display.set_mode(SCREEN_SIZE)
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     player = Player(all_sprites)
+
     for i in range(8):
         Alien(all_sprites, alien)
+
+    score = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -169,12 +170,12 @@ def main():
         all_sprites.update()
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
         for i in s:
-            SCORE += 10
+            score += 10
             Alien(all_sprites, alien)
         screen.fill(BLACK)
         all_sprites.draw(screen)
         draw_text(screen, "Очки: ", 40, (SCREEN_WIDTH / 2 - 50, 10))
-        draw_text(screen, SCORE, 40, (SCREEN_WIDTH / 2 + 50, 10))
+        draw_text(screen, score, 40, (SCREEN_WIDTH / 2 + 50, 10))
         clock.tick(FPS)
         pygame.display.flip()
 
