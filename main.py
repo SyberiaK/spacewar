@@ -131,18 +131,19 @@ class SWSprite(pygame.sprite.Sprite):
 
 def spawn_alien(score):
     if score >= 500:
-        MobileAlien(all_sprites, alien)
+        MobileAlien(score, all_sprites, alien)
     else:
-        Alien(all_sprites, alien)
+        Alien(score, all_sprites, alien)
 
 
 class Alien(SWSprite):
     image_variants = 'alien2.png', 'alien3.png'
 
-    def __init__(self, *groups):
+    def __init__(self, score, *groups):
         image_name = random.choice(self.image_variants)
 
         super().__init__(image_name, *groups)
+        self.score = score
         self.speed = None
         self.direction = [0.0, 1.0]
         self.to_start()
@@ -154,7 +155,10 @@ class Alien(SWSprite):
         x = random.randrange(SCREEN_WIDTH - self.rect.width)
         y = random.randrange(-100, -30)
         self.set_pos(x, y)
-        self.speed = random.randrange(1, 6)
+        if self.score >= 500:
+            self.speed = random.randrange(3, 8)
+        else:
+            self.speed = random.randrange(1, 6)
 
     def update(self):
         self.move(*(d * self.speed for d in self.direction))
@@ -192,12 +196,11 @@ class Bullet(SWSprite):
 class Player(SWSprite):
     image_name = "spaceX.png"
 
-    def __init__(self, *groups, attack_speed: float = 1):
+    def __init__(self, *groups, attack_speed: float = 2):
         super().__init__(self.image_name, *groups)
         self.speed = 8
         self.rect.centerx = SCREEN_WIDTH / 2
         self.rect.bottom = SCREEN_HEIGHT - self.speed
-
         self.attack_speed = attack_speed
         self.shoot_cooldown = 0
 
@@ -245,11 +248,11 @@ def main():
     start_screen(889, 500)
     screen = pygame.display.set_mode(SCREEN_SIZE)
     pygame.display.set_caption("Space War")
+    score = 0
     player = Player(all_sprites)
     for i in range(8):
-        Alien(all_sprites, alien)
+        Alien(score, all_sprites, alien)
 
-    score = 0
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
