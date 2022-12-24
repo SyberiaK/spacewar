@@ -22,18 +22,6 @@ def terminate():
     sys.exit()
 
 
-def split_animated_gif(gif_file_path):
-    ret = []
-    gif = Image.open(gif_file_path)
-    for frame_index in range(gif.n_frames):
-        gif.seek(frame_index)
-        frame_rgba = gif.convert("RGBA")
-        pygame_image = pygame.image.fromstring(
-            frame_rgba.tobytes(), frame_rgba.size, frame_rgba.mode)
-        ret.append(pygame_image)
-    return ret
-
-
 class AnimatedSprite(pygame.sprite.Sprite):
     def __init__(self, frames):
         super().__init__(start_screen_sprite)
@@ -56,7 +44,7 @@ def start_screen(WIDTH, HEIGHT):
     pygame.display.set_caption("Space War")
     font_start = pygame.font.SysFont('SPACE MISSION', 65)
     font_intro = pygame.font.SysFont('SPACE MISSION', 40)
-    d = split_animated_gif('data/sprites/start.gif')
+    d = FileManager.load_gif_frames('start.gif')
     AnimatedSprite(d)
     running = True
     while running:
@@ -95,6 +83,25 @@ class FileManager:
         else:
             image = image.convert_alpha()
         return image
+
+    @staticmethod
+    def load_gif_frames(name: str):
+        path = FileManager.SPRITES_PATH / name
+        if not path.exists():
+            raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
+
+        gif_image = Image.open(path)
+        if gif_image.format != 'GIF' or not gif_image.is_animated:
+            raise ValueError(f"Файл '{name}' по пути '{path}' не является анимированным изображением формата GIF")
+
+        frames = []
+        for idx in range(gif_image.n_frames):
+            gif_image.seek(idx)
+            frame_rgba = gif_image.convert("RGBA")
+            pygame_image = pygame.image.fromstring(
+                frame_rgba.tobytes(), frame_rgba.size, 'RGBA')
+            frames.append(pygame_image)
+        return frames
 
 
 class SWSprite(pygame.sprite.Sprite):
