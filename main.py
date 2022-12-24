@@ -154,7 +154,7 @@ class Alien(SWSprite):
         x = random.randrange(SCREEN_WIDTH - self.rect.width)
         y = random.randrange(-100, -30)
         self.set_pos(x, y)
-        self.speed = random.randrange(1, 9)
+        self.speed = random.randrange(1, 6)
 
     def update(self):
         self.move(*(d * self.speed for d in self.direction))
@@ -192,13 +192,18 @@ class Bullet(SWSprite):
 class Player(SWSprite):
     image_name = "spaceX.png"
 
-    def __init__(self, *groups):
+    def __init__(self, *groups, attack_speed: float = 1):
         super().__init__(self.image_name, *groups)
         self.speed = 8
         self.rect.centerx = SCREEN_WIDTH / 2
         self.rect.bottom = SCREEN_HEIGHT - self.speed
 
+        self.attack_speed = attack_speed
+        self.shoot_cooldown = 0
+
     def update(self):
+        if self.shoot_cooldown:
+            self.shoot_cooldown -= 1 * self.attack_speed
         speed = self.speed  # 8 or 5.656854249492381
         keystate = pygame.key.get_pressed()
         if any((keystate[pygame.K_w], keystate[pygame.K_a], keystate[pygame.K_s], keystate[pygame.K_d])):
@@ -223,7 +228,9 @@ class Player(SWSprite):
             self.move(*(d * speed for d in direction))
 
     def shoot(self):
-        Bullet(self.rect.centerx, self.rect.top, all_sprites, bullets)
+        if self.shoot_cooldown == 0:
+            Bullet(self.rect.centerx, self.rect.top, all_sprites, bullets)
+            self.shoot_cooldown = 60
 
 
 def draw_text(screen, score, size, pos):
@@ -249,8 +256,8 @@ def main():
                 terminate()
             if event.type == pygame.KEYDOWN:
                 player.update()
-            if pygame.key.get_pressed()[pygame.K_SPACE]:
-                player.shoot()
+        if pygame.key.get_pressed()[pygame.K_SPACE]:
+            player.shoot()
 
         all_sprites.update()
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
