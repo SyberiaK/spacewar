@@ -7,6 +7,11 @@ import pygame
 import sys
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
+all_sprites = pygame.sprite.Group()
+aliens = pygame.sprite.Group()
+player_sprite = pygame.sprite.Group()
+player_bullets = pygame.sprite.Group()
+aliens_bullets = pygame.sprite.Group()
 
 
 class GameSettings:
@@ -252,7 +257,7 @@ class SoldierAlien(Alien):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.bottom, self.bullet_group, speed=5)
+            Bullet(self, self.rect.centerx, self.rect.bottom, all_sprites, self.bullet_group, speed=5)
             self.shoot_cooldown = 60
 
 
@@ -321,7 +326,7 @@ class Player(SWSprite):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.top, self.bullet_group)
+            Bullet(self, self.rect.centerx, self.rect.top, all_sprites, self.bullet_group)
             self.shoot_cooldown = 60
 
 
@@ -350,16 +355,11 @@ def main():
     start_screen(889, 500)
     screen = pygame.display.set_mode(GameSettings.screen_size)
 
-    all_sprites = pygame.sprite.Group()
-    aliens = pygame.sprite.Group()
-    player_bullets = pygame.sprite.Group()
-    aliens_bullets = pygame.sprite.Group()
-
     score = 0
     health = 100
-    player = Player(bullet_group=player_bullets)
+    player = Player(all_sprites, player_sprite, bullet_group=player_bullets)
     for _ in range(8):
-        Alien(score, aliens)
+        Alien(score, aliens, all_sprites)
 
     while True:
         for event in pygame.event.get():
@@ -370,26 +370,23 @@ def main():
         if pygame.key.get_pressed()[pygame.K_SPACE]:
             player.shoot()
 
-        all_sprites.add(player, aliens, player_bullets, aliens_bullets)
         all_sprites.update()
         player_bullets_hit_aliens = pygame.sprite.groupcollide(aliens, player_bullets, True, True)
         for _ in player_bullets_hit_aliens:
             score += 10
-            spawn_alien(score, aliens_bullets, aliens)
+            spawn_alien(score, aliens_bullets, aliens, all_sprites)
 
-        aliens_hit_player = pygame.sprite.spritecollide(player, aliens, False)
-        for al in aliens_hit_player:
-            al.kill()
+        aliens_hit_player = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
+        for _ in aliens_hit_player:
             health -= 20
-            spawn_alien(score, aliens_bullets, aliens)
-            if health == 0:
+            spawn_alien(score, aliens_bullets, aliens, all_sprites)
+            if health <= 0:
                 game_over(889, 500)
 
-        alien_bullets_hit_player = pygame.sprite.spritecollide(player, aliens_bullets, False)
-        for al in alien_bullets_hit_player:
-            al.kill()
+        alien_bullets_hit_player = pygame.sprite.groupcollide(player_sprite, aliens_bullets, False, True)
+        for _ in alien_bullets_hit_player:
             health -= 10
-            if health == 0:
+            if health <= 0:
                 game_over(889, 500)
 
         screen.fill('black')
