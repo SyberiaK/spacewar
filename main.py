@@ -15,8 +15,6 @@ all_sprites = pygame.sprite.Group()
 alien = pygame.sprite.Group()
 player_sprite = pygame.sprite.Group()
 bullets = pygame.sprite.Group()
-start_screen_sprite = pygame.sprite.Group()
-game_over_screen_sprite = pygame.sprite.Group()
 
 
 def terminate():
@@ -25,29 +23,55 @@ def terminate():
 
 
 class AnimatedSprite(pygame.sprite.Sprite):
-    def __init__(self, frames, *groups):
+    def __init__(self, frames, framerate, *groups):
         super().__init__(*groups)
+        self.frames = frames
+        self.framerate = framerate
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        self.rect = self.image.get_rect()
+
+    def update(self):
+        frame_step = FPS // self.framerate
+        self.cur_frame += 1
+        if self.cur_frame >= len(self.frames) * frame_step:
+            self.cur_frame = 0
+        self.image = self.frames[self.cur_frame // frame_step]
+
+    def change_frames(self, frames):
         self.frames = frames
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
-        self.rect = pygame.Rect(0, 0, 50, 50)
+        pos = self.pos
+        self.rect = self.image.get_rect()
+        self.set_pos(*pos)
 
-    def update(self):
-        self.cur_frame = (self.cur_frame + 1) % len(self.frames)
-        self.image = self.frames[self.cur_frame]
+    @property
+    def pos(self):
+        return self.rect.topleft
+
+    @property
+    def size(self):
+        return self.rect.size
+
+    def move(self, x, y):
+        self.rect = self.rect.move(x, y)
+
+    def set_pos(self, x, y):
+        self.rect.topleft = x, y
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
 
 
 def start_screen(width, height):
-    fps = 10
-    pygame.font.init()
     space_war = ['Space War']
     intro_text = ['Для начала игры нажмите Enter']
-    scr = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Space War")
-    font_start = pygame.font.SysFont('SPACE MISSION', 65)
-    font_intro = pygame.font.SysFont('SPACE MISSION', 40)
-    d = FileManager.load_gif_frames('start.gif')
-    AnimatedSprite(d, start_screen_sprite)
+    screen = pygame.display.set_mode((width, height))
+    title_font = pygame.font.SysFont('SPACE MISSION', 65)
+    intro_font = pygame.font.SysFont('SPACE MISSION', 40)
+    ba_frames = FileManager.load_gif_frames('start.gif')
+    background_animation = AnimatedSprite(ba_frames, framerate=10)
 
     while True:
         for event in pygame.event.get():
@@ -55,25 +79,26 @@ def start_screen(width, height):
                 terminate()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 return
-        start_screen_sprite.update()
-        start_screen_sprite.draw(scr)
-        for i in space_war:
-            string_rendered = font_start.render(i, True, pygame.Color('DodgerBlue'))
-            scr.blit(string_rendered, (335, 7))
-        for i in intro_text:
-            string_rendered = font_intro.render(i, True, pygame.Color('Aqua'))
-            scr.blit(string_rendered, (230, 460))
-        clock.tick(fps)
+        background_animation.update()
+        background_animation.draw(screen)
+
+        margin = 5
+        for line in space_war:
+            string_rendered = title_font.render(line, True, pygame.Color('DodgerBlue'))
+            string_width, string_height = string_rendered.get_size()
+            screen.blit(string_rendered, (width // 2 - string_width // 2, margin))
+        for line in intro_text:
+            string_rendered = intro_font.render(line, True, pygame.Color('Aqua'))
+            string_width, string_height = string_rendered.get_size()
+            screen.blit(string_rendered, (width // 2 - string_width // 2, height - string_height - margin))
+        clock.tick(FPS)
         pygame.display.flip()
 
 
 def game_over(width, height):
-    fps = 5
-    pygame.font.init()
-    scr = pygame.display.set_mode((width, height))
-    pygame.display.set_caption("Space War")
-    d = FileManager.load_gif_frames('game_over.gif')
-    AnimatedSprite(d, game_over_screen_sprite)
+    screen = pygame.display.set_mode((width, height))
+    sa_frames = FileManager.load_gif_frames('game_over.gif')
+    screen_animation = AnimatedSprite(sa_frames, framerate=5)
 
     while True:
         for event in pygame.event.get():
@@ -81,9 +106,9 @@ def game_over(width, height):
                 terminate()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 terminate()
-        game_over_screen_sprite.update()
-        game_over_screen_sprite.draw(scr)
-        clock.tick(fps)
+        screen_animation.update()
+        screen_animation.draw(screen)
+        clock.tick(FPS)
         pygame.display.flip()
 
 
@@ -139,13 +164,15 @@ class SWSprite(pygame.sprite.Sprite):
 
     def change_image(self, image_name: str):
         self.image = FileManager.load_image(image_name)
-        pos = self.pos()
+        pos = self.pos
         self.rect = self.image.get_rect()
         self.set_pos(*pos)
 
+    @property
     def pos(self):
         return self.rect.topleft
 
+    @property
     def size(self):
         return self.rect.size
 
@@ -154,6 +181,9 @@ class SWSprite(pygame.sprite.Sprite):
 
     def set_pos(self, x, y):
         self.rect.topleft = x, y
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)
 
 
 def spawn_alien(score):
@@ -264,7 +294,6 @@ class Player(SWSprite):
 
 
 def draw_text(screen, score, size, pos):
-    pygame.font.init()
     font = pygame.font.SysFont('SPACE MISSION', size)
     text = font.render(str(score), True, (0, 255, 0))
     screen.blit(text, pos)
@@ -284,9 +313,9 @@ def draw_health(screen, x, y, health):
 
 def main():
     pygame.init()
+    pygame.display.set_caption("Space War")
     start_screen(889, 500)
     screen = pygame.display.set_mode(SCREEN_SIZE)
-    pygame.display.set_caption("Space War")
     score = 0
     health = 100
     player = Player(all_sprites, player_sprite)
