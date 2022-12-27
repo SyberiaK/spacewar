@@ -9,7 +9,6 @@ import sys
 FPS = 60
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
-BLACK = pygame.Color('black')
 clock = pygame.time.Clock()
 all_sprites = pygame.sprite.Group()
 alien = pygame.sprite.Group()
@@ -23,16 +22,16 @@ def terminate():
 
 
 class AnimatedSprite(pygame.sprite.Sprite):
-    def __init__(self, frames, framerate, *groups):
+    def __init__(self, frames, frame_rate, *groups):
         super().__init__(*groups)
         self.frames = frames
-        self.framerate = framerate
+        self.frame_rate = frame_rate
         self.cur_frame = 0
         self.image = self.frames[self.cur_frame]
         self.rect = self.image.get_rect()
 
     def update(self):
-        frame_step = FPS // self.framerate
+        frame_step = FPS // self.frame_rate
         self.cur_frame += 1
         if self.cur_frame >= len(self.frames) * frame_step:
             self.cur_frame = 0
@@ -71,7 +70,7 @@ def start_screen(width, height):
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
     intro_font = pygame.font.SysFont('SPACE MISSION', 40)
     ba_frames = FileManager.load_gif_frames('start.gif')
-    background_animation = AnimatedSprite(ba_frames, framerate=10)
+    background_animation = AnimatedSprite(ba_frames, frame_rate=10)
 
     while True:
         for event in pygame.event.get():
@@ -98,7 +97,7 @@ def start_screen(width, height):
 def game_over(width, height):
     screen = pygame.display.set_mode((width, height))
     sa_frames = FileManager.load_gif_frames('game_over.gif')
-    screen_animation = AnimatedSprite(sa_frames, framerate=5)
+    screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
 
     while True:
         for event in pygame.event.get():
@@ -118,21 +117,21 @@ class FileManager:
     SPRITES_PATH = DATA_PATH / 'sprites'
 
     @staticmethod
-    def load_image(name, colorkey=None):
+    def load_image(name, color_key=None):
         path = FileManager.SPRITES_PATH / name
         if not path.exists():
             raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
 
         image = pygame.image.load(path)
-        if colorkey is not None:
+        if color_key is not None:
             image = image.convert()
-            image.set_colorkey(image.get_at((0, 0)) if colorkey == -1 else colorkey)
+            image.set_colorkey(image.get_at((0, 0)) if color_key == -1 else color_key)
         else:
             image = image.convert_alpha()
         return image
 
     @staticmethod
-    def load_gif_frames(name: str, colorkey=None):
+    def load_gif_frames(name: str, color_key=None):
         path = FileManager.SPRITES_PATH / name
         if not path.exists():
             raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
@@ -146,9 +145,9 @@ class FileManager:
             frame = frame.convert('RGBA')
             pygame_frame = pygame.image.fromstring(frame.tobytes(), frame.size, frame.mode)
 
-            if colorkey is not None:
+            if color_key is not None:
                 pygame_frame = pygame_frame.convert()
-                pygame_frame.set_colorkey(pygame_frame.get_at((0, 0)) if colorkey == -1 else colorkey)
+                pygame_frame.set_colorkey(pygame_frame.get_at((0, 0)) if color_key == -1 else color_key)
             else:
                 pygame_frame = pygame_frame.convert_alpha()
 
@@ -265,16 +264,16 @@ class Player(SWSprite):
         if self.shoot_cooldown:
             self.shoot_cooldown -= 1 * self.attack_speed
         speed = self.speed  # 8 or 5.656854249492381
-        keystate = pygame.key.get_pressed()
-        if any((keystate[pygame.K_w], keystate[pygame.K_a], keystate[pygame.K_s], keystate[pygame.K_d])):
+        keys_pressed = pygame.key.get_pressed()
+        if any((keys_pressed[pygame.K_w], keys_pressed[pygame.K_a], keys_pressed[pygame.K_s], keys_pressed[pygame.K_d])):
             direction = [0, 0]
-            if keystate[pygame.K_a]:
+            if keys_pressed[pygame.K_a]:
                 direction[0] = -1
-            elif keystate[pygame.K_d]:
+            elif keys_pressed[pygame.K_d]:
                 direction[0] = 1
-            if keystate[pygame.K_w]:
+            if keys_pressed[pygame.K_w]:
                 direction[1] = -1
-            elif keystate[pygame.K_s]:
+            elif keys_pressed[pygame.K_s]:
                 direction[1] = 1
 
             if all(direction):
@@ -319,7 +318,7 @@ def main():
     score = 0
     health = 100
     player = Player(all_sprites, player_sprite)
-    for i in range(8):
+    for _ in range(8):
         Alien(score, all_sprites, alien)
 
     while True:
@@ -333,18 +332,18 @@ def main():
 
         all_sprites.update()
         s = pygame.sprite.groupcollide(alien, bullets, True, True)
-        for i in s:
+        for _ in s:
             score += 10
             spawn_alien(score)
 
         s = pygame.sprite.groupcollide(player_sprite, alien, False, True)
-        for i in s:
+        for _ in s:
             health -= 20
             spawn_alien(score)
             if health == 0:
                 game_over(889, 500)
 
-        screen.fill(BLACK)
+        screen.fill('black')
         all_sprites.draw(screen)
         draw_text(screen, "Очки: ", 40, (SCREEN_WIDTH / 2 - 45, 10))
         draw_text(screen, score, 40, (SCREEN_WIDTH / 2 + 50, 10))
