@@ -6,14 +6,12 @@ from PIL import Image, ImageSequence
 import pygame
 import sys
 
-FPS = 60
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
-SCREEN_SIZE = SCREEN_WIDTH, SCREEN_HEIGHT = 750, 1000
-clock = pygame.time.Clock()
-all_sprites = pygame.sprite.Group()
-alien = pygame.sprite.Group()
-player_sprite = pygame.sprite.Group()
-bullets = pygame.sprite.Group()
+
+
+class GameSettings:
+    fps = 60
+    screen_size = screen_width, screen_height = 750, 1000
 
 
 def terminate():
@@ -31,7 +29,7 @@ class AnimatedSprite(pygame.sprite.Sprite):
         self.rect = self.image.get_rect()
 
     def update(self):
-        frame_step = FPS // self.frame_rate
+        frame_step = GameSettings.fps // self.frame_rate
         self.cur_frame += 1
         if self.cur_frame >= len(self.frames) * frame_step:
             self.cur_frame = 0
@@ -63,7 +61,7 @@ class AnimatedSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
-def start_screen(width, height):
+def start_screen(clock, width, height):
     space_war = ['Space War']
     intro_text = ['Для начала игры нажмите Enter']
     screen = pygame.display.set_mode((width, height))
@@ -90,11 +88,11 @@ def start_screen(width, height):
             string_rendered = intro_font.render(line, True, pygame.Color('Aqua'))
             string_width, string_height = string_rendered.get_size()
             screen.blit(string_rendered, (width // 2 - string_width // 2, height - string_height - margin))
-        clock.tick(FPS)
+        clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
-def game_over(width, height):
+def game_over(clock, width, height):
     screen = pygame.display.set_mode((width, height))
     sa_frames = FileManager.load_gif_frames('game_over.gif')
     screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
@@ -107,7 +105,7 @@ def game_over(width, height):
                 terminate()
         screen_animation.update()
         screen_animation.draw(screen)
-        clock.tick(FPS)
+        clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
@@ -185,11 +183,11 @@ class SWSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
-def spawn_alien(score):
+def spawn_alien(score, *groups):
     if score >= 500:
-        MobileAlien(score, all_sprites, alien)
+        MobileAlien(score, *groups)
     else:
-        Alien(score, all_sprites, alien)
+        Alien(score, *groups)
 
 
 class Alien(SWSprite):
@@ -208,7 +206,7 @@ class Alien(SWSprite):
         image_name = random.choice(self.image_variants)
         self.change_image(image_name)
 
-        x = random.randrange(SCREEN_WIDTH - self.rect.width)
+        x = random.randrange(GameSettings.screen_width - self.rect.width)
         y = random.randrange(-100, -30)
         self.set_pos(x, y)
         if self.score >= 500:
@@ -218,7 +216,8 @@ class Alien(SWSprite):
 
     def update(self):
         self.move(*(d * self.speed for d in self.direction))
-        if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
+        if self.rect.top >= GameSettings.screen_height or\
+                self.rect.right <= 0 or self.rect.left >= GameSettings.screen_width:
             self.to_start()
 
 
@@ -245,18 +244,21 @@ class Bullet(SWSprite):
 
     def update(self):
         self.move(0, self.speed)
-        if self.rect.top >= SCREEN_HEIGHT or self.rect.right <= 0 or self.rect.left >= SCREEN_WIDTH:
+        if self.rect.top >= GameSettings.screen_height or\
+                self.rect.right <= 0 or self.rect.left >= GameSettings.screen_width:
             self.kill()
 
 
 class Player(SWSprite):
     image_name = "spaceX.png"
 
-    def __init__(self, *groups, attack_speed: float = 2):
+    def __init__(self, *groups, bullet_group, attack_speed: float = 2):
         super().__init__(self.image_name, *groups)
+        self.bullet_group = bullet_group
+
         self.speed = 8
-        self.rect.centerx = SCREEN_WIDTH / 2
-        self.rect.bottom = SCREEN_HEIGHT - self.speed
+        self.rect.centerx = GameSettings.screen_width / 2
+        self.rect.bottom = GameSettings.screen_height - self.speed
         self.attack_speed = attack_speed
         self.shoot_cooldown = 0
 
@@ -265,7 +267,8 @@ class Player(SWSprite):
             self.shoot_cooldown -= 1 * self.attack_speed
         speed = self.speed  # 8 or 5.656854249492381
         keys_pressed = pygame.key.get_pressed()
-        if any((keys_pressed[pygame.K_w], keys_pressed[pygame.K_a], keys_pressed[pygame.K_s], keys_pressed[pygame.K_d])):
+        if any((keys_pressed[pygame.K_w], keys_pressed[pygame.K_a],
+                keys_pressed[pygame.K_s], keys_pressed[pygame.K_d])):
             direction = [0, 0]
             if keys_pressed[pygame.K_a]:
                 direction[0] = -1
@@ -280,15 +283,15 @@ class Player(SWSprite):
                 speed = (speed ** 2 / 2) ** 0.5
 
             rect_check = self.rect.move(*(d * speed for d in direction))
-            if rect_check.left <= 0 or rect_check.right >= SCREEN_WIDTH:
+            if rect_check.left <= 0 or rect_check.right >= GameSettings.screen_width:
                 direction[0] = 0
-            if rect_check.top <= 0 or rect_check.bottom >= SCREEN_HEIGHT:
+            if rect_check.top <= 0 or rect_check.bottom >= GameSettings.screen_height:
                 direction[1] = 0
             self.move(*(d * speed for d in direction))
 
     def shoot(self):
         if self.shoot_cooldown == 0:
-            Bullet(self.rect.centerx, self.rect.top, all_sprites, bullets)
+            Bullet(self.rect.centerx, self.rect.top, self.bullet_group)
             self.shoot_cooldown = 60
 
 
@@ -313,13 +316,20 @@ def draw_health(screen, x, y, health):
 def main():
     pygame.init()
     pygame.display.set_caption("Space War")
-    start_screen(889, 500)
-    screen = pygame.display.set_mode(SCREEN_SIZE)
+    clock = pygame.time.Clock()
+    start_screen(clock, 889, 500)
+    screen = pygame.display.set_mode(GameSettings.screen_size)
+
+    all_sprites = pygame.sprite.Group()
+    aliens = pygame.sprite.Group()
+    player_sprite = pygame.sprite.Group()
+    bullets = pygame.sprite.Group()
+
     score = 0
     health = 100
-    player = Player(all_sprites, player_sprite)
+    player = Player(player_sprite, bullet_group=bullets)
     for _ in range(8):
-        Alien(score, all_sprites, alien)
+        Alien(score, aliens)
 
     while True:
         for event in pygame.event.get():
@@ -330,25 +340,26 @@ def main():
         if pygame.key.get_pressed()[pygame.K_SPACE]:
             player.shoot()
 
+        all_sprites.add(aliens, player_sprite, bullets)
         all_sprites.update()
-        s = pygame.sprite.groupcollide(alien, bullets, True, True)
+        s = pygame.sprite.groupcollide(aliens, bullets, True, True)
         for _ in s:
             score += 10
-            spawn_alien(score)
+            spawn_alien(score, aliens)
 
-        s = pygame.sprite.groupcollide(player_sprite, alien, False, True)
+        s = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
         for _ in s:
             health -= 20
-            spawn_alien(score)
+            spawn_alien(score, aliens)
             if health == 0:
-                game_over(889, 500)
+                game_over(clock, 889, 500)
 
         screen.fill('black')
         all_sprites.draw(screen)
-        draw_text(screen, "Очки: ", 40, (SCREEN_WIDTH / 2 - 45, 10))
-        draw_text(screen, score, 40, (SCREEN_WIDTH / 2 + 50, 10))
-        draw_health(screen, SCREEN_WIDTH - 730, 17, health)
-        clock.tick(FPS)
+        draw_text(screen, "Очки: ", 40, (GameSettings.screen_width // 2 - 45, 10))
+        draw_text(screen, score, 40, (GameSettings.screen_width // 2 + 50, 10))
+        draw_health(screen, 20, 20, health)
+        clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
