@@ -61,10 +61,12 @@ class AnimatedSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
-def start_screen(clock, width, height):
+def start_screen(width, height):
     space_war = ['Space War']
     intro_text = ['Для начала игры нажмите Enter']
     screen = pygame.display.set_mode((width, height))
+    clock = pygame.time.Clock()
+
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
     intro_font = pygame.font.SysFont('SPACE MISSION', 40)
     ba_frames = FileManager.load_gif_frames('start.gif')
@@ -92,8 +94,10 @@ def start_screen(clock, width, height):
         pygame.display.flip()
 
 
-def game_over(clock, width, height):
+def game_over(width, height):
     screen = pygame.display.set_mode((width, height))
+    clock = pygame.time.Clock()
+
     sa_frames = FileManager.load_gif_frames('game_over.gif')
     screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
 
@@ -183,7 +187,9 @@ class SWSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
-def spawn_alien(score, *groups):
+def spawn_alien(score, bullet_group, *groups):
+    if score >= 600:
+        SoldierAlien(score, bullet_group, *groups)
     if score >= 500:
         MobileAlien(score, *groups)
     else:
@@ -227,24 +233,48 @@ class MobileAlien(Alien):
         self.direction[0] = random.uniform(-1, 1)
 
 
+class SoldierAlien(Alien):
+    def __init__(self, score, bullet_group, *groups):
+        super().__init__(score, *groups)
+        self.bullet_group = bullet_group
+        self.stop_at = self.size[1] + random.randint(-10, 50)
+
+        self.attack_speed = 0.25
+        self.shoot_cooldown = random.randint(0, 60)
+
+    def update(self):
+        if self.rect.centery < self.stop_at:
+            super().update()
+        elif self.shoot_cooldown <= 0:
+            self.shoot()
+        else:
+            self.shoot_cooldown -= 1 * self.attack_speed
+
+    def shoot(self):
+        if self.shoot_cooldown <= 0:
+            Bullet(self, self.rect.centerx, self.rect.bottom, self.bullet_group, speed=5)
+            self.shoot_cooldown = 60
+
+
 class Bullet(SWSprite):
     image_name = "bullet.png"
 
-    def __init__(self, x, y, *groups):
+    def __init__(self, owner, x: int, y: int, *groups, speed: int = 10):
         super().__init__(self.image_name, *groups)
-        self.rect.bottom = y
+        if isinstance(owner, Player):
+            self.target = Alien
+        elif isinstance(owner, Alien):
+            self.target = Player
+            self.image = pygame.transform.flip(self.image, False, True)
+        else:
+            raise ValueError(f'Владелец должен относиться к классу Player или классу Alien')
         self.rect.centerx = x
-        self.speed = -10
-        self.to_start()
-
-    def to_start(self):
-        x = self.rect.centerx - 7
-        y = self.rect.bottom
-        self.set_pos(x, y)
+        self.rect.bottom = y
+        self.speed = speed
 
     def update(self):
-        self.move(0, self.speed)
-        if self.rect.top >= GameSettings.screen_height or\
+        self.move(0, self.speed if self.target == Player else -self.speed)
+        if self.rect.bottom <= 0 or self.rect.top >= GameSettings.screen_height or \
                 self.rect.right <= 0 or self.rect.left >= GameSettings.screen_width:
             self.kill()
 
@@ -263,7 +293,7 @@ class Player(SWSprite):
         self.shoot_cooldown = 0
 
     def update(self):
-        if self.shoot_cooldown:
+        if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1 * self.attack_speed
         speed = self.speed  # 8 or 5.656854249492381
         keys_pressed = pygame.key.get_pressed()
@@ -290,8 +320,8 @@ class Player(SWSprite):
             self.move(*(d * speed for d in direction))
 
     def shoot(self):
-        if self.shoot_cooldown == 0:
-            Bullet(self.rect.centerx, self.rect.top, self.bullet_group)
+        if self.shoot_cooldown <= 0:
+            Bullet(self, self.rect.centerx, self.rect.top, self.bullet_group)
             self.shoot_cooldown = 60
 
 
@@ -317,17 +347,17 @@ def main():
     pygame.init()
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    start_screen(clock, 889, 500)
+    start_screen(889, 500)
     screen = pygame.display.set_mode(GameSettings.screen_size)
 
     all_sprites = pygame.sprite.Group()
     aliens = pygame.sprite.Group()
-    player_sprite = pygame.sprite.Group()
-    bullets = pygame.sprite.Group()
+    player_bullets = pygame.sprite.Group()
+    aliens_bullets = pygame.sprite.Group()
 
     score = 0
     health = 100
-    player = Player(player_sprite, bullet_group=bullets)
+    player = Player(bullet_group=player_bullets)
     for _ in range(8):
         Alien(score, aliens)
 
@@ -340,19 +370,27 @@ def main():
         if pygame.key.get_pressed()[pygame.K_SPACE]:
             player.shoot()
 
-        all_sprites.add(aliens, player_sprite, bullets)
+        all_sprites.add(player, aliens, player_bullets, aliens_bullets)
         all_sprites.update()
-        s = pygame.sprite.groupcollide(aliens, bullets, True, True)
-        for _ in s:
+        player_bullets_hit_aliens = pygame.sprite.groupcollide(aliens, player_bullets, True, True)
+        for _ in player_bullets_hit_aliens:
             score += 10
-            spawn_alien(score, aliens)
+            spawn_alien(score, aliens_bullets, aliens)
 
-        s = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
-        for _ in s:
+        aliens_hit_player = pygame.sprite.spritecollide(player, aliens, False)
+        for al in aliens_hit_player:
+            al.kill()
             health -= 20
-            spawn_alien(score, aliens)
+            spawn_alien(score, aliens_bullets, aliens)
             if health == 0:
-                game_over(clock, 889, 500)
+                game_over(889, 500)
+
+        alien_bullets_hit_player = pygame.sprite.spritecollide(player, aliens_bullets, False)
+        for al in alien_bullets_hit_player:
+            al.kill()
+            health -= 10
+            if health == 0:
+                game_over(889, 500)
 
         screen.fill('black')
         all_sprites.draw(screen)
