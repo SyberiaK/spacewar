@@ -262,10 +262,16 @@ class SoldierAlien(Alien):
 
 
 class Bullet(SWSprite):
-    image_name = "bullet.png"
+    image_names = "bullet_player.png", "bullet_alien.png"
 
     def __init__(self, owner, x: int, y: int, *groups, speed: int = 10):
-        super().__init__(self.image_name, *groups)
+        image_name = ''
+        if isinstance(owner, Player):
+            image_name = self.image_names[0]
+        elif isinstance(owner, Alien):
+            image_name = self.image_names[1]
+
+        super().__init__(image_name, *groups)
         if isinstance(owner, Player):
             self.target = Alien
         elif isinstance(owner, Alien):
