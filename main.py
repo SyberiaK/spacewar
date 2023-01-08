@@ -67,22 +67,35 @@ class AnimatedSprite(pygame.sprite.Sprite):
 
 
 def start_screen(width, height):
+    start_music = FileManager.load_sound('start.mp3')
+    start_music.set_volume(0.7)
+    start_engine = FileManager.load_sound('start_engine.mp3')
+    start_engine.set_volume(0.6)
     space_war = ['Space War']
-    intro_text = ['Для начала игры нажмите Enter']
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
+    start_button = FileManager.load_image('start.png')
+    rect = start_button.get_rect()
+    rect.x, rect.y = 350, 440
 
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
-    intro_font = pygame.font.SysFont('SPACE MISSION', 40)
     ba_frames = FileManager.load_gif_frames('start.gif')
     background_animation = AnimatedSprite(ba_frames, frame_rate=10)
+    start_music.play(-1)
 
     while True:
         for event in pygame.event.get():
+            x, y = pygame.mouse.get_pos()
             if event.type == pygame.QUIT:
                 terminate()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if pygame.mouse.get_pressed()[0]:
+                    if rect.collidepoint(x, y):
+                        start_music.stop()
+                        start_engine.play()
+                        pygame.time.wait(5000)
+                        return
+
         background_animation.update()
         background_animation.draw(screen)
 
@@ -91,20 +104,21 @@ def start_screen(width, height):
             string_rendered = title_font.render(line, True, pygame.Color('DodgerBlue'))
             string_width, string_height = string_rendered.get_size()
             screen.blit(string_rendered, (width // 2 - string_width // 2, margin))
-        for line in intro_text:
-            string_rendered = intro_font.render(line, True, pygame.Color('Aqua'))
-            string_width, string_height = string_rendered.get_size()
-            screen.blit(string_rendered, (width // 2 - string_width // 2, height - string_height - margin))
+
+        screen.blit(start_button, rect)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
 def game_over(width, height):
+    end_music = FileManager.load_sound('game-over.mp3')
+    end_music.set_volume(0.7)
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
 
     sa_frames = FileManager.load_gif_frames('game_over.gif')
     screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
+    end_music.play()
 
     while True:
         for event in pygame.event.get():
@@ -122,6 +136,8 @@ class FileManager:
     DATA_PATH = Path.cwd() / 'data'
 
     SPRITES_PATH = DATA_PATH / 'sprites'
+
+    SOUNDS_PATH = DATA_PATH / 'sounds'
 
     @staticmethod
     def load_image(name, color_key=None):
@@ -160,6 +176,15 @@ class FileManager:
 
             frames.append(pygame_frame)
         return frames
+
+    @ staticmethod
+    def load_sound(name):
+        path = FileManager.SOUNDS_PATH / name
+        if not path.exists():
+            raise FileNotFoundError(f"Файл со звуком '{name}' по пути '{path}' не найден")
+
+        sound = pygame.mixer.Sound(path)
+        return sound
 
 
 class SWSprite(pygame.sprite.Sprite):
@@ -343,6 +368,12 @@ def draw_text(screen, score, size, pos):
 
 
 def draw_health(screen, x, y, health):
+    heart = FileManager.load_image('live.png')
+    rect = heart.get_rect()
+    rect.x, rect.y = 5, 6
+    green = pygame.Color('green')
+    orange = pygame.Color('dark orange')
+    red = pygame.Color('red')
     if health < 0:
         health = 0
     width = 200
@@ -350,58 +381,102 @@ def draw_health(screen, x, y, health):
     health_size = (health / 100) * width
     fill_line = pygame.Rect(x, y, health_size, height)
     fill_outline = pygame.Rect(x, y, width, height)
-    pygame.draw.rect(screen, pygame.Color('green'), fill_line)
-    pygame.draw.rect(screen, pygame.Color('red'), fill_outline, 2)
+    if health > 50:
+        pygame.draw.rect(screen, green, fill_line)
+    elif 20 < health <= 50:
+        pygame.draw.rect(screen, orange, fill_line)
+    else:
+        pygame.draw.rect(screen, red, fill_line)
+    pygame.draw.rect(screen, red, fill_outline, 2)
+    screen.blit(heart, rect)
 
 
 def main():
     pygame.init()
+    hit_aliens_sound = FileManager.load_sound('strike.mp3')
+    hit_aliens_sound.set_volume(0.7)
+    fon_music = FileManager.load_sound('fon_sound.mp3')
+    damage = FileManager.load_sound('damage.mp3')
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     start_screen(889, 500)
     screen = pygame.display.set_mode(GameSettings.screen_size)
+    pause = False
 
     score = 0
     health = 100
     player = Player(all_sprites, player_sprite, bullet_group=player_bullets)
     for _ in range(8):
         Alien(score, aliens, all_sprites)
+    background_image = FileManager.load_image('screen_fon.png')
+    background_rect = background_image.get_rect()
+
+    pause_button = FileManager.load_image('pause.png')
+    play_button = FileManager.load_image('play.png')
+    play_or_pause = pause_button
+    play_or_pause_rect = play_or_pause.get_rect()
+    play_or_pause_rect.x, play_or_pause_rect.y = 10, 45
+
+    fon_music.play()
+    fon_music.set_volume(0.5)
 
     while True:
+        x, y = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 terminate()
-            if event.type == pygame.KEYDOWN:
-                player.update()
-        if pygame.key.get_pressed()[pygame.K_SPACE]:
-            player.shoot()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if pygame.mouse.get_pressed()[0]:
+                    if play_or_pause_rect.collidepoint(x, y):
+                        pause = not pause
+        if not pause:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    terminate()
+                if event.type == pygame.KEYDOWN:
+                    player.update()
+            if pygame.key.get_pressed()[pygame.K_SPACE]:
+                player.shoot()
 
-        all_sprites.update()
-        player_bullets_hit_aliens = pygame.sprite.groupcollide(aliens, player_bullets, True, True)
-        for _ in player_bullets_hit_aliens:
-            score += 10
-            spawn_alien(score, aliens_bullets, aliens, all_sprites)
+            all_sprites.update()
+            player_bullets_hit_aliens = pygame.sprite.groupcollide(aliens, player_bullets, True, True)
+            for _ in player_bullets_hit_aliens:
+                score += 10
+                spawn_alien(score, aliens_bullets, aliens, all_sprites)
+                hit_aliens_sound.play()
 
-        aliens_hit_player = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
-        for _ in aliens_hit_player:
-            health -= 20
-            spawn_alien(score, aliens_bullets, aliens, all_sprites)
-            if health <= 0:
-                game_over(889, 500)
+            aliens_hit_player = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
+            for _ in aliens_hit_player:
+                health -= 20
+                damage.play()
+                spawn_alien(score, aliens_bullets, aliens, all_sprites)
+                if health <= 0:
+                    fon_music.stop()
+                    game_over(889, 500)
 
-        alien_bullets_hit_player = pygame.sprite.groupcollide(player_sprite, aliens_bullets, False, True)
-        for _ in alien_bullets_hit_player:
-            health -= 10
-            if health <= 0:
-                game_over(889, 500)
+            alien_bullets_hit_player = pygame.sprite.groupcollide(player_sprite, aliens_bullets, False, True)
+            for _ in alien_bullets_hit_player:
+                health -= 10
+                damage.play()
+                if health <= 0:
+                    fon_music.stop()
+                    game_over(889, 500)
 
-        screen.fill('black')
-        all_sprites.draw(screen)
-        draw_text(screen, "Очки: ", 40, (GameSettings.screen_width // 2 - 45, 10))
-        draw_text(screen, score, 40, (GameSettings.screen_width // 2 + 50, 10))
-        draw_health(screen, 20, 20, health)
-        clock.tick(GameSettings.fps)
-        pygame.display.flip()
+            play_or_pause = pause_button
+
+            screen.fill('black')
+            screen.blit(background_image, background_rect)
+            screen.blit(play_or_pause, play_or_pause_rect)
+            all_sprites.draw(screen)
+            draw_text(screen, "Очки: ", 40, (GameSettings.screen_width * 0.8 - 45, 15))
+            draw_text(screen, score, 40, (GameSettings.screen_width * 0.8 + 50, 15))
+            draw_health(screen, 20, 20, health)
+            clock.tick(GameSettings.fps)
+            pygame.display.flip()
+        else:
+            play_or_pause = play_button
+            screen.blit(play_or_pause, play_or_pause_rect)
+            pygame.display.flip()
 
 
 if __name__ == '__main__':
