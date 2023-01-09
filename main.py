@@ -2,6 +2,7 @@ import os
 import random
 from pathlib import Path
 from PIL import Image, ImageSequence
+from tkinter import messagebox
 
 import pygame
 import sys
@@ -22,6 +23,13 @@ class GameSettings:
 def terminate():
     pygame.quit()
     sys.exit()
+
+
+def exiting_the_game():
+    answer = messagebox.askyesno(title="Подтверждение о выходе", message="Вы хотите выйти из игры?")
+
+    if answer:
+        terminate()
 
 
 class AnimatedSprite(pygame.sprite.Sprite):
@@ -83,17 +91,26 @@ def start_screen(width, height):
     background_animation = AnimatedSprite(ba_frames, frame_rate=10)
     start_music.play(-1)
 
+    def to_game():
+        start_music.stop()
+        start_engine.play()
+        pygame.time.wait(5000)
+
     while True:
         for event in pygame.event.get():
             x, y = pygame.mouse.get_pos()
             if event.type == pygame.QUIT:
-                terminate()
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    to_game()
+                    return
+                if event.key == pygame.K_ESCAPE:
+                    exiting_the_game()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if pygame.mouse.get_pressed()[0]:
                     if rect.collidepoint(x, y):
-                        start_music.stop()
-                        start_engine.play()
-                        pygame.time.wait(5000)
+                        to_game()
                         return
 
         background_animation.update()
@@ -123,9 +140,13 @@ def game_over(width, height):
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                terminate()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
-                terminate()
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    exiting_the_game()
+                if event.key == pygame.K_ESCAPE:
+                    exiting_the_game()
+
         screen_animation.update()
         screen_animation.draw(screen)
         clock.tick(GameSettings.fps)
@@ -424,7 +445,10 @@ def main():
         x, y = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                terminate()
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    exiting_the_game()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if pygame.mouse.get_pressed()[0]:
                     if play_or_pause_rect.collidepoint(x, y):
@@ -432,7 +456,7 @@ def main():
         if not pause:
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    terminate()
+                    exiting_the_game()
                 if event.type == pygame.KEYDOWN:
                     player.update()
             if pygame.key.get_pressed()[pygame.K_SPACE]:
