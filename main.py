@@ -8,16 +8,39 @@ import pygame
 import sys
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
-all_sprites = pygame.sprite.Group()
-aliens = pygame.sprite.Group()
-player_sprite = pygame.sprite.Group()
-player_bullets = pygame.sprite.Group()
-aliens_bullets = pygame.sprite.Group()
+
+
+class GameController:
+    all_sprites = pygame.sprite.Group()
+    aliens = pygame.sprite.Group()
+    player_sprite = pygame.sprite.Group()
+    player_bullets = pygame.sprite.Group()
+    aliens_bullets = pygame.sprite.Group()
+
+    score = 0
+    player_health = 100
+
+    current_boss = None
+
+    @staticmethod
+    def spawn_alien():
+        gc = GameController
+        if gc.current_boss is None:
+            if gc.score >= 1000:
+                gc.current_boss = BossAlien(gc.aliens_bullets, gc.aliens, gc.all_sprites)
+            elif gc.score >= 600:
+                SoldierAlien(gc.aliens_bullets, gc.aliens, gc.all_sprites)
+            elif gc.score >= 500:
+                MobileAlien(gc.aliens, gc.all_sprites)
+            else:
+                RammingAlien(gc.aliens, gc.all_sprites)
 
 
 class GameSettings:
     fps = 60
     screen_size = screen_width, screen_height = 750, 1000
+    sound_volume = .7
+    music_volume = .5
 
 
 def terminate():
@@ -76,9 +99,9 @@ class AnimatedSprite(pygame.sprite.Sprite):
 
 def start_screen(width, height):
     start_music = FileManager.load_sound('start.mp3')
-    start_music.set_volume(0.7)
+    start_music.set_volume(GameSettings.music_volume)
     start_engine = FileManager.load_sound('start_engine.mp3')
-    start_engine.set_volume(0.6)
+    start_engine.set_volume(GameSettings.music_volume)
     space_war = ['Space War']
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
@@ -129,7 +152,7 @@ def start_screen(width, height):
 
 def game_over(width, height):
     end_music = FileManager.load_sound('game-over.mp3')
-    end_music.set_volume(0.7)
+    end_music.set_volume(GameSettings.music_volume)
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
 
@@ -198,14 +221,13 @@ class FileManager:
             frames.append(pygame_frame)
         return frames
 
-    @ staticmethod
+    @staticmethod
     def load_sound(name):
         path = FileManager.SOUNDS_PATH / name
         if not path.exists():
             raise FileNotFoundError(f"Файл со звуком '{name}' по пути '{path}' не найден")
 
-        sound = pygame.mixer.Sound(path)
-        return sound
+        return pygame.mixer.Sound(path)
 
 
 class SWSprite(pygame.sprite.Sprite):
@@ -238,56 +260,53 @@ class SWSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
-def spawn_alien(score, bullet_group, *groups):
-    if score >= 600:
-        SoldierAlien(score, bullet_group, *groups)
-    if score >= 500:
-        MobileAlien(score, *groups)
-    else:
-        Alien(score, *groups)
-
-
 class Alien(SWSprite):
     image_variants = 'alien2.png', 'alien3.png'
 
-    def __init__(self, score, *groups):
-        image_name = random.choice(self.image_variants)
+    def __init__(self, *groups, image_name=None):
+        if image_name is None:
+            image_name = random.choice(self.image_variants)
 
         super().__init__(image_name, *groups)
-        self.score = score
-        self.speed = None
-        self.direction = [0.0, 1.0]
-        self.to_start()
 
-    def to_start(self):
-        image_name = random.choice(self.image_variants)
-        self.change_image(image_name)
-
-        x = random.randrange(GameSettings.screen_width - self.rect.width)
-        y = random.randrange(-100, -30)
-        self.set_pos(x, y)
-        if self.score >= 500:
+        if GameController.score >= 500:
             self.speed = random.randrange(3, 8)
         else:
             self.speed = random.randrange(1, 6)
+
+        self.direction = [.0, .0]
+        self.to_start()
+
+    def to_start(self):
+        x = random.randrange(GameSettings.screen_width - self.rect.width)
+        y = random.randrange(-100, -30)
+        self.set_pos(x, y)
 
     def update(self):
         self.move(*(d * self.speed for d in self.direction))
         if self.rect.top >= GameSettings.screen_height or\
                 self.rect.right <= 0 or self.rect.left >= GameSettings.screen_width:
-            self.to_start()
+            self.kill()
+            GameController.spawn_alien()
+
+
+class RammingAlien(Alien):
+    def __init__(self, *groups):
+        super().__init__(*groups)
+        self.direction[1] = 1
 
 
 class MobileAlien(Alien):
-    def to_start(self):
-        super().to_start()
-        self.direction[0] = random.uniform(-1, 1)
+    def __init__(self, *groups, image_name=None):
+        super().__init__(*groups, image_name=image_name)
+        self.direction = [random.uniform(-1, 1), 1]
 
 
-class SoldierAlien(Alien):
-    def __init__(self, score, bullet_group, *groups):
-        super().__init__(score, *groups)
+class SoldierAlien(MobileAlien):
+    def __init__(self, bullet_group, *groups, image_name=None):
+        super().__init__(*groups, image_name=image_name)
         self.bullet_group = bullet_group
+
         self.stop_at = self.size[1] + random.randint(-10, 50)
 
         self.attack_speed = 0.25
@@ -303,8 +322,43 @@ class SoldierAlien(Alien):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.bottom, all_sprites, self.bullet_group, speed=5)
+            Bullet(self, self.rect.centerx, self.rect.bottom, GameController.all_sprites, self.bullet_group, speed=5)
             self.shoot_cooldown = 60
+
+
+class BossAlien(SoldierAlien):
+    def __init__(self, bullet_group, *groups):
+        super().__init__(bullet_group, *groups, image_name='boss.gif')
+        self.health = 15
+
+        self.repeat_attack = 3
+        self.repeat_cooldown = 0
+        self.attack_counter = self.repeat_attack
+
+    def update(self):
+        if self.rect.centery < self.stop_at:
+            super().update()
+        elif self.shoot_cooldown <= 0:
+            if self.attack_counter == 0:
+                self.attack_counter = self.repeat_attack
+            if self.repeat_cooldown <= 0:
+                self.shoot()
+            else:
+                self.repeat_cooldown -= 1 * self.attack_speed
+        else:
+            self.shoot_cooldown -= 1 * self.attack_speed
+
+    def shoot(self):
+        if self.shoot_cooldown <= 0:
+            Bullet(self, self.rect.centerx - 50, self.rect.bottom, GameController.all_sprites,
+                   self.bullet_group, speed=5)
+            Bullet(self, self.rect.centerx + 50, self.rect.bottom, GameController.all_sprites,
+                   self.bullet_group, speed=5)
+            self.attack_counter -= 1
+            if self.attack_counter:
+                self.repeat_cooldown = 60 // self.repeat_attack
+            else:
+                self.shoot_cooldown = 60
 
 
 class Bullet(SWSprite):
@@ -378,33 +432,34 @@ class Player(SWSprite):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.top, all_sprites, self.bullet_group)
+            Bullet(self, self.rect.centerx, self.rect.top, GameController.all_sprites, self.bullet_group)
             self.shoot_cooldown = 60
 
 
-def draw_text(screen, score, size, pos):
+def draw_text(screen, string, size, pos):
     font = pygame.font.SysFont('SPACE MISSION', size)
-    text = font.render(str(score), True, (0, 255, 0))
+    text = font.render(string, True, (0, 255, 0))
     screen.blit(text, pos)
 
 
-def draw_health(screen, x, y, health):
+def draw_health(screen, x, y):
     heart = FileManager.load_image('live.png')
     rect = heart.get_rect()
     rect.x, rect.y = 5, 6
     green = pygame.Color('green')
     orange = pygame.Color('dark orange')
     red = pygame.Color('red')
-    if health < 0:
-        health = 0
+
     width = 200
     height = 15
-    health_size = (health / 100) * width
+
+    h = max(0, GameController.player_health)
+    health_size = (h / 100) * width
     fill_line = pygame.Rect(x, y, health_size, height)
     fill_outline = pygame.Rect(x, y, width, height)
-    if health > 50:
+    if h > 50:
         pygame.draw.rect(screen, green, fill_line)
-    elif 20 < health <= 50:
+    elif 20 < h <= 50:
         pygame.draw.rect(screen, orange, fill_line)
     else:
         pygame.draw.rect(screen, red, fill_line)
@@ -413,22 +468,24 @@ def draw_health(screen, x, y, health):
 
 
 def main():
+    gc = GameController
+    gs = GameSettings
+
     pygame.init()
     hit_aliens_sound = FileManager.load_sound('strike.mp3')
-    hit_aliens_sound.set_volume(0.7)
+    hit_aliens_sound.set_volume(gs.sound_volume)
     fon_music = FileManager.load_sound('fon_sound.mp3')
     damage = FileManager.load_sound('damage.mp3')
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     start_screen(889, 500)
-    screen = pygame.display.set_mode(GameSettings.screen_size)
+    screen = pygame.display.set_mode(gs.screen_size)
     pause = False
 
-    score = 0
-    health = 100
-    player = Player(all_sprites, player_sprite, bullet_group=player_bullets)
+    player = Player(gc.all_sprites, gc.player_sprite, bullet_group=gc.player_bullets)
     for _ in range(8):
-        Alien(score, aliens, all_sprites)
+        RammingAlien(gc.aliens, gc.all_sprites)
+
     background_image = FileManager.load_image('screen_fon.png')
     background_rect = background_image.get_rect()
 
@@ -438,8 +495,8 @@ def main():
     play_or_pause_rect = play_or_pause.get_rect()
     play_or_pause_rect.x, play_or_pause_rect.y = 10, 45
 
+    fon_music.set_volume(gs.music_volume)
     fon_music.play()
-    fon_music.set_volume(0.5)
 
     while True:
         x, y = pygame.mouse.get_pos()
@@ -462,45 +519,50 @@ def main():
             if pygame.key.get_pressed()[pygame.K_SPACE]:
                 player.shoot()
 
-            all_sprites.update()
-            player_bullets_hit_aliens = pygame.sprite.groupcollide(aliens, player_bullets, True, True)
-            for _ in player_bullets_hit_aliens:
-                score += 10
-                spawn_alien(score, aliens_bullets, aliens, all_sprites)
+            gc.all_sprites.update()
+            player_bullets_hit_aliens = pygame.sprite.groupcollide(gc.aliens, gc.player_bullets, False, True)
+            for alien in player_bullets_hit_aliens:
+                if isinstance(alien, BossAlien):
+                    alien.health -= 1
+                    if alien.health <= 0:
+                        alien.kill()
+                        gc.current_boss = None
+                        gc.score += 100
+                        gc.spawn_alien()
+                else:
+                    alien.kill()
+                    gc.score += 10
+                    gc.spawn_alien()
                 hit_aliens_sound.play()
 
-            aliens_hit_player = pygame.sprite.groupcollide(player_sprite, aliens, False, True)
+            aliens_hit_player = pygame.sprite.groupcollide(gc.player_sprite, gc.aliens, False, True)
             for _ in aliens_hit_player:
-                health -= 20
+                gc.player_health -= 20
                 damage.play()
-                spawn_alien(score, aliens_bullets, aliens, all_sprites)
-                if health <= 0:
-                    fon_music.stop()
-                    game_over(889, 500)
+                gc.spawn_alien()
 
-            alien_bullets_hit_player = pygame.sprite.groupcollide(player_sprite, aliens_bullets, False, True)
+            alien_bullets_hit_player = pygame.sprite.groupcollide(gc.player_sprite, gc.aliens_bullets, False, True)
             for _ in alien_bullets_hit_player:
-                health -= 10
+                gc.player_health -= 10
                 damage.play()
-                if health <= 0:
-                    fon_music.stop()
-                    game_over(889, 500)
+
+            if gc.player_health <= 0:
+                fon_music.stop()
+                game_over(889, 500)
 
             play_or_pause = pause_button
 
             screen.fill('black')
             screen.blit(background_image, background_rect)
-            screen.blit(play_or_pause, play_or_pause_rect)
-            all_sprites.draw(screen)
-            draw_text(screen, "Очки: ", 40, (GameSettings.screen_width * 0.8 - 45, 15))
-            draw_text(screen, score, 40, (GameSettings.screen_width * 0.8 + 50, 15))
-            draw_health(screen, 20, 20, health)
-            clock.tick(GameSettings.fps)
-            pygame.display.flip()
+            gc.all_sprites.draw(screen)
+            draw_text(screen, "Очки: ", 40, (gs.screen_width * 0.8 - 45, 15))
+            draw_text(screen, str(gc.score), 40, (gs.screen_width * 0.8 + 50, 15))
+            draw_health(screen, 20, 20)
+            clock.tick(gs.fps)
         else:
             play_or_pause = play_button
-            screen.blit(play_or_pause, play_or_pause_rect)
-            pygame.display.flip()
+        screen.blit(play_or_pause, play_or_pause_rect)
+        pygame.display.flip()
 
 
 if __name__ == '__main__':
