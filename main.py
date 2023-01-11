@@ -5,6 +5,7 @@ from PIL import Image, ImageSequence
 from tkinter import messagebox
 
 import pygame
+import sqlite3
 import sys
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
@@ -16,9 +17,11 @@ class GameController:
     player_sprite = pygame.sprite.Group()
     player_bullets = pygame.sprite.Group()
     aliens_bullets = pygame.sprite.Group()
+    textbox = pygame.sprite.Group()
 
     score = 0
     player_health = 100
+    nickname = ''
 
     current_boss = None
 
@@ -39,8 +42,8 @@ class GameController:
 class GameSettings:
     fps = 60
     screen_size = screen_width, screen_height = 750, 1000
-    sound_volume = .7
-    music_volume = .5
+    sound_volume = 0.7
+    music_volume = 0.5
 
 
 def terminate():
@@ -97,6 +100,68 @@ class AnimatedSprite(pygame.sprite.Sprite):
         surface.blit(self.image, self.rect)
 
 
+class TextInputBox(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__(GameController.textbox)
+        self.color = pygame.Color('white')
+        self.pos = (50, 50)
+        self.width = 550
+        self.font = pygame.font.SysFont('SPACE MISSION', 100)
+        self.cursor = False
+        self.text = "Введите ник ..."
+        self.render_text()
+
+    def render_text(self):
+        if len(self.text) > 11:
+            self.text = self.text[:-1]
+        text_surf = self.font.render(self.text, True, pygame.Color('DodgerBlue'))
+        self.image = pygame.Surface((self.width + 10, text_surf.get_height() + 10))
+        self.image.blit(text_surf, (10, 10))
+        pygame.draw.rect(self.image, self.color, self.image.get_rect(), 3)
+        self.rect = self.image.get_rect(topleft=self.pos)
+
+    def update(self, event_list):
+        for event in event_list:
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if not self.cursor:
+                    self.text = ""
+                    self.cursor = self.rect.collidepoint(event.pos)
+            if event.type == pygame.KEYDOWN:
+                if self.cursor:
+                    if event.key == pygame.K_RETURN:
+                        if len(self.text) == 0 or self.text == "Введите ник":
+                            pass
+                        else:
+                            GameController.nickname = self.text
+                            main()
+                    elif event.key == pygame.K_BACKSPACE:
+                        self.text = self.text[:-1]
+                    else:
+                        self.text += event.unicode
+                    self.render_text()
+
+
+def input_nick():
+    pygame.init()
+    screen = pygame.display.set_mode((650, 200))
+    pygame.display.set_caption("Space War")
+    clock = pygame.time.Clock()
+    box = TextInputBox()
+    background_image = FileManager.load_image('screen_fon.png')
+    background_rect = background_image.get_rect()
+    while True:
+        event_list = pygame.event.get()
+        for event in event_list:
+            if event.type == pygame.QUIT:
+                exiting_the_game()
+        box.update(event_list)
+        screen.fill((0, 0, 0))
+        screen.blit(background_image, background_rect)
+        GameController.textbox.draw(screen)
+        clock.tick(GameSettings.fps)
+        pygame.display.flip()
+
+
 def start_screen(width, height):
     start_music = FileManager.load_sound('start.mp3')
     start_music.set_volume(GameSettings.music_volume)
@@ -106,10 +171,14 @@ def start_screen(width, height):
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
     start_button = FileManager.load_image('start.png')
+    icon = FileManager.load_image('ikonka.png')
+    rect_icon = icon.get_rect()
+    rect_icon.x, rect_icon.y = 5, 6
     rect = start_button.get_rect()
     rect.x, rect.y = 350, 440
 
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
+    profile = pygame.font.SysFont('SPACE MISSION', 50)
     ba_frames = FileManager.load_gif_frames('start.gif')
     background_animation = AnimatedSprite(ba_frames, frame_rate=10)
     start_music.play(-1)
@@ -135,6 +204,8 @@ def start_screen(width, height):
                     if rect.collidepoint(x, y):
                         to_game()
                         return
+                    if rect_icon.collidepoint(x, y):
+                        input_nick()
 
         background_animation.update()
         background_animation.draw(screen)
@@ -145,7 +216,11 @@ def start_screen(width, height):
             string_width, string_height = string_rendered.get_size()
             screen.blit(string_rendered, (width // 2 - string_width // 2, margin))
 
+        nickname_rendered = profile.render(GameController.nickname, True, pygame.Color('Tomato'))
+        screen.blit(nickname_rendered, (width * 0.05, margin + 5))
+
         screen.blit(start_button, rect)
+        screen.blit(icon, rect_icon)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
@@ -160,13 +235,31 @@ def game_over(width, height):
     screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
     end_music.play()
 
+    con = FileManager.load_base('result.db')
+    cur = con.cursor()
+    result = cur.execute("""SELECT Nickname FROM score
+                            WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+
+    if len(result) == 0:
+        entities = (GameController.nickname, GameController.score)
+        sql_insert(con, entities)
+    else:
+        result_score = cur.execute("""SELECT Score FROM score
+                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+        old_score = result_score[0][0]
+        if old_score < GameController.score:
+            entities = (GameController.score, GameController.nickname)
+            sql_update(con, entities)
+
     while True:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    exiting_the_game()
+                    GameController.score = 0
+                    GameController.player_health = 100
+                    main()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
 
@@ -176,12 +269,31 @@ def game_over(width, height):
         pygame.display.flip()
 
 
+def sql_insert(con, entities):
+    cur = con.cursor()
+    cur.execute(
+        """INSERT INTO score(Nickname, Score) VALUES(?, ?)""",
+        entities)
+    con.commit()
+
+
+def sql_update(con, entities):
+    cur = con.cursor()
+    cur.execute("""UPDATE score
+                   SET Score = ?
+                   WHERE Nickname = ?""",
+                entities)
+    con.commit()
+
+
 class FileManager:
     DATA_PATH = Path.cwd() / 'data'
 
     SPRITES_PATH = DATA_PATH / 'sprites'
 
     SOUNDS_PATH = DATA_PATH / 'sounds'
+
+    BASE_PATH = DATA_PATH / 'Result'
 
     @staticmethod
     def load_image(name, color_key=None):
@@ -229,6 +341,14 @@ class FileManager:
 
         return pygame.mixer.Sound(path)
 
+    @staticmethod
+    def load_base(name):
+        path = FileManager.BASE_PATH / name
+        if not path.exists():
+            raise FileNotFoundError(f"Файл с базой данных '{name}' по пути '{path}' не найден")
+
+        return sqlite3.connect(path)
+
 
 class SWSprite(pygame.sprite.Sprite):
     def __init__(self, image_name: str, *groups: pygame.sprite.Group):
@@ -274,7 +394,7 @@ class Alien(SWSprite):
         else:
             self.speed = random.randrange(1, 6)
 
-        self.direction = [.0, .0]
+        self.direction = [0.0, 0.0]
         self.to_start()
 
     def to_start(self):
@@ -471,7 +591,6 @@ def main():
     gc = GameController
     gs = GameSettings
 
-    pygame.init()
     hit_aliens_sound = FileManager.load_sound('strike.mp3')
     hit_aliens_sound.set_volume(gs.sound_volume)
     fon_music = FileManager.load_sound('fon_sound.mp3')
@@ -566,4 +685,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    input_nick()
