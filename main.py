@@ -22,6 +22,7 @@ class GameController:
     score = 0
     player_health = 100
     nickname = ''
+    timer = 0
 
     current_boss = None
 
@@ -37,6 +38,15 @@ class GameController:
                 MobileAlien(gc.aliens, gc.all_sprites)
             else:
                 RammingAlien(gc.aliens, gc.all_sprites)
+
+    @staticmethod
+    def gc_defaults():
+        gc = GameController
+        gc.score = 0
+        gc.player_health = 100
+        gc.timer = 0
+
+        gc.current_boss = None
 
 
 class GameSettings:
@@ -59,7 +69,7 @@ def exiting_the_game():
 
 
 class AnimatedSprite(pygame.sprite.Sprite):
-    def __init__(self, frames, frame_rate, *groups):
+    def __init__(self, frames, *groups, frame_rate: int):
         super().__init__(*groups)
         self.frames = frames
         self.frame_rate = frame_rate
@@ -163,64 +173,67 @@ def input_nick():
 
 
 def start_screen(width, height):
-    start_music = FileManager.load_sound('start.mp3')
-    start_music.set_volume(GameSettings.music_volume)
-    start_engine = FileManager.load_sound('start_engine.mp3')
-    start_engine.set_volume(GameSettings.music_volume)
-    space_war = ['Space War']
-    screen = pygame.display.set_mode((width, height))
-    clock = pygame.time.Clock()
-    start_button = FileManager.load_image('start.png')
-    icon = FileManager.load_image('ikonka.png')
-    rect_icon = icon.get_rect()
-    rect_icon.x, rect_icon.y = 5, 6
-    rect = start_button.get_rect()
-    rect.x, rect.y = 350, 440
-
-    title_font = pygame.font.SysFont('SPACE MISSION', 65)
-    profile = pygame.font.SysFont('SPACE MISSION', 50)
-    ba_frames = FileManager.load_gif_frames('start.gif')
-    background_animation = AnimatedSprite(ba_frames, frame_rate=10)
-    start_music.play(-1)
-
     def to_game():
         start_music.stop()
         start_engine.play()
         pygame.time.wait(5000)
 
+    start_screen_sprites = pygame.sprite.Group()
+
+    start_music = FileManager.load_sound('start.mp3')
+    start_music.set_volume(GameSettings.music_volume)
+    start_engine = FileManager.load_sound('start_engine.mp3')
+    start_engine.set_volume(GameSettings.music_volume)
+
+    space_war = ['Space War']
+    screen = pygame.display.set_mode((width, height))
+    clock = pygame.time.Clock()
+
+    ui_margin = 5
+
+    title_font = pygame.font.SysFont('SPACE MISSION', 65)
+    profile = pygame.font.SysFont('SPACE MISSION', 50)
+    ba_frames = FileManager.load_gif_frames('start.gif')
+    background_animation = AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
+
+    start_button = UIButton('start.png', start_screen_sprites)
+    start_button.rect.centerx = width // 2
+    start_button.rect.bottom = height - ui_margin
+
+    icon = UIButton('ikonka.png', start_screen_sprites)
+    icon.set_pos(ui_margin, ui_margin + 1)
+
+    start_music.play(-1)
+
     while True:
         for event in pygame.event.get():
-            x, y = pygame.mouse.get_pos()
             if event.type == pygame.QUIT:
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    to_game()
-                    return
+                    return to_game()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
             if event.type == pygame.MOUSEBUTTONDOWN:
-                if pygame.mouse.get_pressed()[0]:
-                    if rect.collidepoint(x, y):
-                        to_game()
-                        return
-                    if rect_icon.collidepoint(x, y):
+                if event.button == 1:
+                    x, y = pygame.mouse.get_pos()
+                    if start_button.is_clicked(x, y):
+                        return to_game()
+                    if icon.is_clicked(x, y):
+                        start_music.stop()
                         input_nick()
 
-        background_animation.update()
-        background_animation.draw(screen)
+        start_screen_sprites.update()
+        start_screen_sprites.draw(screen)
 
-        margin = 5
         for line in space_war:
             string_rendered = title_font.render(line, True, pygame.Color('DodgerBlue'))
             string_width, string_height = string_rendered.get_size()
-            screen.blit(string_rendered, (width // 2 - string_width // 2, margin))
+            screen.blit(string_rendered, (width // 2 - string_width // 2, ui_margin))
 
         nickname_rendered = profile.render(GameController.nickname, True, pygame.Color('Tomato'))
-        screen.blit(nickname_rendered, (width * 0.05, margin + 5))
+        screen.blit(nickname_rendered, (50, ui_margin + 5))
 
-        screen.blit(start_button, rect)
-        screen.blit(icon, rect_icon)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
@@ -351,13 +364,24 @@ class FileManager:
 
 
 class SWSprite(pygame.sprite.Sprite):
-    def __init__(self, image_name: str, *groups: pygame.sprite.Group):
+    def __init__(self, image: str | pygame.Surface, *groups: pygame.sprite.Group):
         super().__init__(*groups)
-        self.image = FileManager.load_image(image_name)
+        if isinstance(image, pygame.Surface):
+            self.image = image
+        elif isinstance(image, str):
+            self.image = FileManager.load_image(image)
+        else:
+            raise TypeError('Картинка может быть представлена только в виде строки пути или Surface')
         self.rect = self.image.get_rect()
 
-    def change_image(self, image_name: str):
-        self.image = FileManager.load_image(image_name)
+    def change_image(self, image: str | pygame.Surface):
+        if isinstance(image, pygame.Surface):
+            self.image = image
+        elif isinstance(image, str):
+            self.image = FileManager.load_image(image)
+        else:
+            raise TypeError('Картинка может быть представлена только в виде строки пути или Surface')
+
         pos = self.pos
         self.rect = self.image.get_rect()
         self.set_pos(*pos)
@@ -378,6 +402,11 @@ class SWSprite(pygame.sprite.Sprite):
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
+
+
+class UIButton(SWSprite):
+    def is_clicked(self, x, y):
+        return self.rect.collidepoint(x, y)
 
 
 class Alien(SWSprite):
@@ -563,12 +592,10 @@ def draw_text(screen, string, size, pos):
 
 
 def draw_health(screen, x, y):
-    heart = FileManager.load_image('live.png')
-    rect = heart.get_rect()
-    rect.x, rect.y = 5, 6
-    green = pygame.Color('green')
-    orange = pygame.Color('dark orange')
-    red = pygame.Color('red')
+    ui_margin = 5
+
+    heart = SWSprite('live.png')
+    heart.set_pos(ui_margin, ui_margin)
 
     width = 200
     height = 15
@@ -578,22 +605,26 @@ def draw_health(screen, x, y):
     fill_line = pygame.Rect(x, y, health_size, height)
     fill_outline = pygame.Rect(x, y, width, height)
     if h > 50:
-        pygame.draw.rect(screen, green, fill_line)
+        pygame.draw.rect(screen, 'green', fill_line)
     elif 20 < h <= 50:
-        pygame.draw.rect(screen, orange, fill_line)
+        pygame.draw.rect(screen, 'dark orange', fill_line)
     else:
-        pygame.draw.rect(screen, red, fill_line)
-    pygame.draw.rect(screen, red, fill_outline, 2)
-    screen.blit(heart, rect)
+        pygame.draw.rect(screen, 'red', fill_line)
+    pygame.draw.rect(screen, 'red', fill_outline, 2)
+    heart.draw(screen)
 
 
 def main():
     gc = GameController
+    gc.gc_defaults()
     gs = GameSettings
+
+    game_ui_sprites = pygame.sprite.Group()
 
     hit_aliens_sound = FileManager.load_sound('strike.mp3')
     hit_aliens_sound.set_volume(gs.sound_volume)
     fon_music = FileManager.load_sound('fon_sound.mp3')
+    fon_music.set_volume(gs.music_volume)
     damage = FileManager.load_sound('damage.mp3')
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
@@ -601,20 +632,17 @@ def main():
     screen = pygame.display.set_mode(gs.screen_size)
     pause = False
 
+    background_image = SWSprite('screen_fon.png', gc.all_sprites)
+
     player = Player(gc.all_sprites, gc.player_sprite, bullet_group=gc.player_bullets)
     for _ in range(8):
         RammingAlien(gc.aliens, gc.all_sprites)
 
-    background_image = FileManager.load_image('screen_fon.png')
-    background_rect = background_image.get_rect()
-
     pause_button = FileManager.load_image('pause.png')
     play_button = FileManager.load_image('play.png')
-    play_or_pause = pause_button
-    play_or_pause_rect = play_or_pause.get_rect()
-    play_or_pause_rect.x, play_or_pause_rect.y = 10, 45
+    play_pause_button = UIButton(pause_button, game_ui_sprites)
+    play_pause_button.set_pos(10, 45)
 
-    fon_music.set_volume(gs.music_volume)
     fon_music.play()
 
     while True:
@@ -627,7 +655,7 @@ def main():
                     exiting_the_game()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if pygame.mouse.get_pressed()[0]:
-                    if play_or_pause_rect.collidepoint(x, y):
+                    if play_pause_button.is_clicked(x, y):
                         pause = not pause
         if not pause:
             for event in pygame.event.get():
@@ -669,18 +697,18 @@ def main():
                 fon_music.stop()
                 game_over(889, 500)
 
-            play_or_pause = pause_button
+            play_pause_button.change_image(pause_button)
 
             screen.fill('black')
-            screen.blit(background_image, background_rect)
+
             gc.all_sprites.draw(screen)
             draw_text(screen, "Очки: ", 40, (gs.screen_width * 0.8 - 45, 15))
             draw_text(screen, str(gc.score), 40, (gs.screen_width * 0.8 + 50, 15))
             draw_health(screen, 20, 20)
             clock.tick(gs.fps)
         else:
-            play_or_pause = play_button
-        screen.blit(play_or_pause, play_or_pause_rect)
+            play_pause_button.change_image(play_button)
+        game_ui_sprites.draw(screen)
         pygame.display.flip()
 
 
