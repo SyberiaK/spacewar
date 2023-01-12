@@ -1,8 +1,9 @@
 import os
 import random
 from pathlib import Path
+from typing import Tuple
 from PIL import Image, ImageSequence
-from tkinter import messagebox
+from tkinter import Tk, messagebox
 
 import pygame
 import sqlite3
@@ -62,6 +63,7 @@ def terminate():
 
 
 def exiting_the_game():
+    Tk().withdraw()
     answer = messagebox.askyesno(title="Подтверждение о выходе", message="Вы хотите выйти из игры?")
 
     if answer:
@@ -196,11 +198,12 @@ def start_screen(width, height):
     ba_frames = FileManager.load_gif_frames('start.gif')
     background_animation = AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
 
-    start_button = UIButton('start.png', start_screen_sprites)
+    start_button = UIButton('start.png', start_screen_sprites, text='123456',
+                            font=pygame.font.SysFont('SPACE MISSION', 50))
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
 
-    icon = UIButton('ikonka.png', start_screen_sprites)
+    icon = UIButton('ikonka.png', start_screen_sprites, text='', font=profile)
     icon.set_pos(ui_margin, ui_margin + 1)
 
     start_music.play(-1)
@@ -405,8 +408,22 @@ class SWSprite(pygame.sprite.Sprite):
 
 
 class UIButton(SWSprite):
+    def __init__(self, image: str | pygame.Surface, *groups,
+                 text: str, font: pygame.font.Font, color: Tuple[int, int, int] = (0, 0, 0),
+                 antialias: bool = True):
+        super().__init__(image, *groups)
+        self.font = font
+        self.text = text
+        self.params = (antialias, color)
+
     def is_clicked(self, x, y):
         return self.rect.collidepoint(x, y)
+
+    def update(self):
+        t = self.font.render(self.text, *self.params)
+        text_width, text_height = t.get_size()
+        text_pos = self.rect.width // 2 - text_width // 2, self.rect.height // 2 - text_height // 2
+        self.image.blit(t, text_pos)
 
 
 class Alien(SWSprite):
@@ -428,7 +445,7 @@ class Alien(SWSprite):
 
     def to_start(self):
         x = random.randrange(GameSettings.screen_width - self.rect.width)
-        y = random.randrange(-100, -30)
+        y = random.randrange(-200, -30)
         self.set_pos(x, y)
 
     def update(self):
@@ -640,7 +657,8 @@ def main():
 
     pause_button = FileManager.load_image('pause.png')
     play_button = FileManager.load_image('play.png')
-    play_pause_button = UIButton(pause_button, game_ui_sprites)
+    play_pause_button = UIButton(pause_button, game_ui_sprites, text='PAUSE',
+                                 font=pygame.font.SysFont('SPACE MISSION', 40))
     play_pause_button.set_pos(10, 45)
 
     fon_music.play()
@@ -698,6 +716,7 @@ def main():
                 game_over(889, 500)
 
             play_pause_button.change_image(pause_button)
+            play_pause_button.text = 'PAUSE'
 
             screen.fill('black')
 
@@ -708,7 +727,9 @@ def main():
             clock.tick(gs.fps)
         else:
             play_pause_button.change_image(play_button)
+            play_pause_button.text = 'PLAY'
         game_ui_sprites.draw(screen)
+        game_ui_sprites.update()
         pygame.display.flip()
 
 
