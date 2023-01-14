@@ -360,7 +360,7 @@ def result():
     clock = pygame.time.Clock()
     background = FileManager.load_image("fon_result.png")
     background_rect = background.get_rect()
-    fps = 60
+
     while True:
         screen.fill((0, 0, 0))
         for event in pygame.event.get():
@@ -371,7 +371,7 @@ def result():
                     return start_screen(889, 500)
         screen.blit(background, background_rect)
         leader_board(screen, width)
-        clock.tick(fps)
+        clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
