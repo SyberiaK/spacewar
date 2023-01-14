@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Tuple
 from PIL import Image, ImageSequence
 from tkinter import Tk, messagebox
+from operator import itemgetter
 
 import pygame
 import sqlite3
@@ -217,6 +218,8 @@ def start_screen(width, height):
                     return to_game()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
+                if event.key == pygame.K_r:
+                    result()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     x, y = pygame.mouse.get_pos()
@@ -300,6 +303,76 @@ def sql_update(con, entities):
                    WHERE Nickname = ?""",
                 entities)
     con.commit()
+
+
+def leader_board(screen, width):
+    pygame.font.init()
+    i = 35
+
+    title_font_style = pygame.font.SysFont('SPACE MISSION', 60)
+    top_font_style = pygame.font.SysFont('SPACE MISSION', 50)
+    font_style = pygame.font.SysFont('SPACE MISSION', 50)
+    yellow = pygame.Color('yellow')
+    red = pygame.Color('red')
+    green = pygame.Color('green')
+
+    con = FileManager.load_base('result.db')
+    cur = con.cursor()
+    result = cur.execute("""SELECT * FROM score
+                            ORDER BY Score desc LIMIT 10""").fetchall()
+
+    if len(result) != 0:
+        title1 = title_font_style.render('PLAYER', True, yellow)
+        title2 = title_font_style.render('SCORE', True, yellow)
+        screen.blit(title1, [width / 7 + 20, (700 / 16)])
+        screen.blit(title2, [width / 7 + 280, (700 / 16)])
+        count = 1
+        result.sort(key=itemgetter(1), reverse=True)
+        for row in result:
+            if count == 1:
+                column0 = top_font_style.render(f"{str(count)}.", True, green)
+                column1 = top_font_style.render('{:>3}'.format(row[0]), True, green)
+                column2 = top_font_style.render('{:30}'.format(row[1]), True, green)
+            else:
+                column0 = font_style.render(f"{str(count)}.", True, red)
+                column1 = font_style.render('{:>3}'.format(row[0]), True, red)
+                column2 = font_style.render('{:30}'.format(row[1]), True, red)
+
+            screen.blit(column1, [width / 7 + 30, (700 / 11) + i + 20])
+            screen.blit(column2, [width / 5 + 42, (700 / 11) + i + 20])
+            screen.blit(column0, [width / 13, (700 / 11) + i + 20])
+            count += 1
+            i += 55
+    else:
+        line1_text = title_font_style.render(f"К сожалению,", True, yellow)
+        line2_text = title_font_style.render(f"никто ещё не сыграл", True, yellow)
+        line3_text = title_font_style.render(f"в игру", True, yellow)
+
+        screen.blit(line1_text, [width / 5 + 30, (700 / 11) + i + 20])
+        screen.blit(line2_text, [width / 10 + 17, (700 / 11) + i * 3 + 20])
+        screen.blit(line3_text, [width / 3 + 35, (700 / 11) + i * 5 + 20])
+
+
+def result():
+    pygame.display.set_caption('Space war')
+    size = width, height = 565, 870
+    screen = pygame.display.set_mode(size)
+    clock = pygame.time.Clock()
+    background = FileManager.load_image("fon_result.png")
+    background_rect = background.get_rect()
+    fps = 60
+    while True:
+        screen.fill((0, 0, 0))
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return start_screen(889, 500)
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_RETURN:
+                    return start_screen(889, 500)
+        screen.blit(background, background_rect)
+        leader_board(screen, width)
+        clock.tick(fps)
+        pygame.display.flip()
 
 
 class FileManager:
