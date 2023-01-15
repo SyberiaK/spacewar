@@ -1,14 +1,15 @@
 import os
 import random
-from pathlib import Path
 from typing import Tuple
-from PIL import Image, ImageSequence
 from tkinter import Tk, messagebox
 from operator import itemgetter
 
 import pygame
-import sqlite3
 import sys
+
+from managers import FileManager, SoundManager
+from settings import GameSettings
+from swsprite import SWSprite
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 
@@ -26,36 +27,73 @@ class GameController:
     nickname = ''
     timer = 0
 
+    player = None
     current_boss = None
 
-    @staticmethod
-    def spawn_alien():
-        gc = GameController
-        if gc.current_boss is None:
-            if gc.score >= 1000:
-                gc.current_boss = BossAlien(gc.aliens_bullets, gc.aliens, gc.all_sprites)
-            elif gc.score >= 600:
-                SoldierAlien(gc.aliens_bullets, gc.aliens, gc.all_sprites)
-            elif gc.score >= 500:
-                MobileAlien(gc.aliens, gc.all_sprites)
+    @classmethod
+    def spawn_alien(cls):
+        if cls.current_boss is None:
+            if cls.score >= 1000:
+                cls.current_boss = BossAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites)
+            elif cls.score >= 600:
+                SoldierAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites)
+            elif cls.score >= 500:
+                MobileAlien(cls.aliens, cls.all_sprites)
             else:
-                RammingAlien(gc.aliens, gc.all_sprites)
+                RammingAlien(cls.aliens, cls.all_sprites)
 
-    @staticmethod
-    def gc_defaults():
-        gc = GameController
-        gc.score = 0
-        gc.player_health = 100
-        gc.timer = 0
+    @classmethod
+    def alien_reward(cls, alien):
+        if isinstance(alien, BossAlien):
+            cls.current_boss = None
+            cls.score += 100
+        else:
+            cls.score += 10
 
-        gc.current_boss = None
+    @classmethod
+    def update(cls):
+        gs = GameSettings
 
+        cls.all_sprites.update()
+        player_bullets_hit_aliens = pygame.sprite.groupcollide(cls.aliens, cls.player_bullets, False, True)
+        for alien in player_bullets_hit_aliens:
+            alien.health -= 1
+            if alien.health <= 0:
+                alien.kill()
+                cls.alien_reward(alien)
+                cls.spawn_alien()
+            SoundManager.play_sound('alien_hit', volume=gs.sound_volume)
 
-class GameSettings:
-    fps = 60
-    screen_size = screen_width, screen_height = 750, 1000
-    sound_volume = 0.7
-    music_volume = 0.5
+        aliens_hit_player = pygame.sprite.groupcollide(cls.aliens, cls.player_sprite, False, False)
+        for alien in aliens_hit_player:
+            alien.health -= 1
+            if alien.health <= 0:
+                alien.kill()
+                cls.spawn_alien()
+            cls.player_health -= 20
+            SoundManager.play_sound('player_damage', volume=gs.sound_volume)
+
+        alien_bullets_hit_player = pygame.sprite.groupcollide(cls.aliens_bullets, cls.player_sprite, False, True)
+        for bullet in alien_bullets_hit_player:
+            cls.player_health -= bullet.damage
+            SoundManager.play_sound('player_damage', volume=gs.sound_volume)
+
+        if cls.player_health <= 0:
+            SoundManager.stop_sound('background_music')
+            cls.player.kill()
+            cls.player = None
+            for a in cls.aliens:
+                a.kill()
+            game_over(889, 500)
+
+    @classmethod
+    def gc_defaults(cls):
+        cls.score = 0
+        cls.player_health = 100
+        cls.timer = 0
+
+        cls.player = Player(cls.all_sprites, cls.player_sprite, bullet_group=cls.player_bullets)
+        cls.current_boss = None
 
 
 def terminate():
@@ -176,17 +214,17 @@ def input_nick():
 
 
 def start_screen(width, height):
+    gs = GameSettings
+
     def to_game():
-        start_music.stop()
-        start_engine.play()
+        SoundManager.stop_sound('main_menu_theme')
+        SoundManager.play_sound('start_game', volume=gs.music_volume)
         pygame.time.wait(5000)
 
     start_screen_sprites = pygame.sprite.Group()
 
-    start_music = FileManager.load_sound('start.mp3')
-    start_music.set_volume(GameSettings.music_volume)
-    start_engine = FileManager.load_sound('start_engine.mp3')
-    start_engine.set_volume(GameSettings.music_volume)
+    SoundManager.load_sound('main_menu_theme', 'start.mp3')
+    SoundManager.load_sound('start_game', 'start_engine.mp3')
 
     space_war = ['Space War']
     screen = pygame.display.set_mode((width, height))
@@ -197,7 +235,7 @@ def start_screen(width, height):
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
     profile = pygame.font.SysFont('SPACE MISSION', 50)
     ba_frames = FileManager.load_gif_frames('start.gif')
-    background_animation = AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
+    AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
 
     start_button = UIButton('start.png', start_screen_sprites, text='123456',
                             font=pygame.font.SysFont('SPACE MISSION', 50))
@@ -207,7 +245,7 @@ def start_screen(width, height):
     icon = UIButton('ikonka.png', start_screen_sprites, text='', font=profile)
     icon.set_pos(ui_margin, ui_margin + 1)
 
-    start_music.play(-1)
+    SoundManager.play_sound('main_menu_theme', volume=gs.music_volume, loop=True)
 
     while True:
         for event in pygame.event.get():
@@ -226,7 +264,7 @@ def start_screen(width, height):
                     if start_button.is_clicked(x, y):
                         return to_game()
                     if icon.is_clicked(x, y):
-                        start_music.stop()
+                        SoundManager.stop_sound('main_menu_theme')
                         input_nick()
 
         start_screen_sprites.update()
@@ -245,14 +283,14 @@ def start_screen(width, height):
 
 
 def game_over(width, height):
-    end_music = FileManager.load_sound('game-over.mp3')
-    end_music.set_volume(GameSettings.music_volume)
+    SoundManager.load_sound('game_over', 'game-over.mp3')
+
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
 
     sa_frames = FileManager.load_gif_frames('game_over.gif')
     screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
-    end_music.play()
+    SoundManager.play_sound('game_over', volume=GameSettings.music_volume)
 
     con = FileManager.load_base('result.db')
     cur = con.cursor()
@@ -375,111 +413,6 @@ def result():
         pygame.display.flip()
 
 
-class FileManager:
-    DATA_PATH = Path.cwd() / 'data'
-
-    SPRITES_PATH = DATA_PATH / 'sprites'
-
-    SOUNDS_PATH = DATA_PATH / 'sounds'
-
-    BASE_PATH = DATA_PATH / 'Result'
-
-    @staticmethod
-    def load_image(name, color_key=None):
-        path = FileManager.SPRITES_PATH / name
-        if not path.exists():
-            raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
-
-        image = pygame.image.load(path)
-        if color_key is not None:
-            image = image.convert()
-            image.set_colorkey(image.get_at((0, 0)) if color_key == -1 else color_key)
-        else:
-            image = image.convert_alpha()
-        return image
-
-    @staticmethod
-    def load_gif_frames(name: str, color_key=None):
-        path = FileManager.SPRITES_PATH / name
-        if not path.exists():
-            raise FileNotFoundError(f"Файл с изображением '{name}' по пути '{path}' не найден")
-
-        gif_image = Image.open(path)
-        if gif_image.format != 'GIF' or not gif_image.is_animated:
-            raise ValueError(f"Файл '{name}' по пути '{path}' не является анимированным изображением формата GIF")
-
-        frames = []
-        for frame in ImageSequence.Iterator(gif_image):
-            frame = frame.convert('RGBA')
-            pygame_frame = pygame.image.fromstring(frame.tobytes(), frame.size, frame.mode)
-
-            if color_key is not None:
-                pygame_frame = pygame_frame.convert()
-                pygame_frame.set_colorkey(pygame_frame.get_at((0, 0)) if color_key == -1 else color_key)
-            else:
-                pygame_frame = pygame_frame.convert_alpha()
-
-            frames.append(pygame_frame)
-        return frames
-
-    @staticmethod
-    def load_sound(name):
-        path = FileManager.SOUNDS_PATH / name
-        if not path.exists():
-            raise FileNotFoundError(f"Файл со звуком '{name}' по пути '{path}' не найден")
-
-        return pygame.mixer.Sound(path)
-
-    @staticmethod
-    def load_base(name):
-        path = FileManager.BASE_PATH / name
-        if not path.exists():
-            raise FileNotFoundError(f"Файл с базой данных '{name}' по пути '{path}' не найден")
-
-        return sqlite3.connect(path)
-
-
-class SWSprite(pygame.sprite.Sprite):
-    def __init__(self, image: str | pygame.Surface, *groups: pygame.sprite.Group):
-        super().__init__(*groups)
-        if isinstance(image, pygame.Surface):
-            self.image = image
-        elif isinstance(image, str):
-            self.image = FileManager.load_image(image)
-        else:
-            raise TypeError('Картинка может быть представлена только в виде строки пути или Surface')
-        self.rect = self.image.get_rect()
-
-    def change_image(self, image: str | pygame.Surface):
-        if isinstance(image, pygame.Surface):
-            self.image = image
-        elif isinstance(image, str):
-            self.image = FileManager.load_image(image)
-        else:
-            raise TypeError('Картинка может быть представлена только в виде строки пути или Surface')
-
-        pos = self.pos
-        self.rect = self.image.get_rect()
-        self.set_pos(*pos)
-
-    @property
-    def pos(self):
-        return self.rect.topleft
-
-    @property
-    def size(self):
-        return self.rect.size
-
-    def move(self, x, y):
-        self.rect = self.rect.move(x, y)
-
-    def set_pos(self, x, y):
-        self.rect.topleft = x, y
-
-    def draw(self, surface):
-        surface.blit(self.image, self.rect)
-
-
 class UIButton(SWSprite):
     def __init__(self, image: str | pygame.Surface, *groups,
                  text: str, font: pygame.font.Font, color: Tuple[int, int, int] = (0, 0, 0),
@@ -507,6 +440,8 @@ class Alien(SWSprite):
             image_name = random.choice(self.image_variants)
 
         super().__init__(image_name, *groups)
+
+        self.health = 1
 
         if GameController.score >= 500:
             self.speed = random.randrange(3, 8)
@@ -548,6 +483,7 @@ class SoldierAlien(MobileAlien):
 
         self.stop_at = self.size[1] + random.randint(-10, 50)
 
+        self.bullet_damage = 10
         self.attack_speed = 0.25
         self.shoot_cooldown = random.randint(0, 60)
 
@@ -561,7 +497,8 @@ class SoldierAlien(MobileAlien):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.bottom, GameController.all_sprites, self.bullet_group, speed=5)
+            Bullet(self, self.rect.centerx, self.rect.bottom, GameController.all_sprites, self.bullet_group,
+                   damage=10, speed=5)
             self.shoot_cooldown = 60
 
 
@@ -603,7 +540,7 @@ class BossAlien(SoldierAlien):
 class Bullet(SWSprite):
     image_names = "bullet_player.png", "bullet_alien.png"
 
-    def __init__(self, owner, x: int, y: int, *groups, speed: int = 10):
+    def __init__(self, owner, x: int, y: int, *groups, damage: int = 1, speed: int = 10):
         image_name = ''
         if isinstance(owner, Player):
             image_name = self.image_names[0]
@@ -620,6 +557,7 @@ class Bullet(SWSprite):
             raise ValueError(f'Владелец должен относиться к классу Player или классу Alien')
         self.rect.centerx = x
         self.rect.bottom = y
+        self.damage = damage
         self.speed = speed
 
     def update(self):
@@ -706,25 +644,23 @@ def draw_health(screen, x, y):
 
 def main():
     gc = GameController
-    gc.gc_defaults()
     gs = GameSettings
 
     game_ui_sprites = pygame.sprite.Group()
 
-    hit_aliens_sound = FileManager.load_sound('strike.mp3')
-    hit_aliens_sound.set_volume(gs.sound_volume)
-    fon_music = FileManager.load_sound('fon_sound.mp3')
-    fon_music.set_volume(gs.music_volume)
-    damage = FileManager.load_sound('damage.mp3')
+    SoundManager.load_sound('alien_hit', 'strike.mp3')
+    SoundManager.load_sound('background_music', 'fon_sound.mp3')
+    SoundManager.load_sound('player_damage', 'damage.mp3')
+
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     start_screen(889, 500)
     screen = pygame.display.set_mode(gs.screen_size)
     pause = False
 
-    background_image = SWSprite('screen_fon.png', gc.all_sprites)
+    SWSprite('screen_fon.png', gc.all_sprites)
 
-    player = Player(gc.all_sprites, gc.player_sprite, bullet_group=gc.player_bullets)
+    gc.gc_defaults()
     for _ in range(8):
         RammingAlien(gc.aliens, gc.all_sprites)
 
@@ -734,7 +670,7 @@ def main():
                                  font=pygame.font.SysFont('SPACE MISSION', 40))
     play_pause_button.set_pos(10, 45)
 
-    fon_music.play()
+    SoundManager.play_sound('background_music', volume=gs.music_volume, loop=True)
 
     while True:
         x, y = pygame.mouse.get_pos()
@@ -753,40 +689,11 @@ def main():
                 if event.type == pygame.QUIT:
                     exiting_the_game()
                 if event.type == pygame.KEYDOWN:
-                    player.update()
+                    gc.player.update()
             if pygame.key.get_pressed()[pygame.K_SPACE]:
-                player.shoot()
+                gc.player.shoot()
 
-            gc.all_sprites.update()
-            player_bullets_hit_aliens = pygame.sprite.groupcollide(gc.aliens, gc.player_bullets, False, True)
-            for alien in player_bullets_hit_aliens:
-                if isinstance(alien, BossAlien):
-                    alien.health -= 1
-                    if alien.health <= 0:
-                        alien.kill()
-                        gc.current_boss = None
-                        gc.score += 100
-                        gc.spawn_alien()
-                else:
-                    alien.kill()
-                    gc.score += 10
-                    gc.spawn_alien()
-                hit_aliens_sound.play()
-
-            aliens_hit_player = pygame.sprite.groupcollide(gc.player_sprite, gc.aliens, False, True)
-            for _ in aliens_hit_player:
-                gc.player_health -= 20
-                damage.play()
-                gc.spawn_alien()
-
-            alien_bullets_hit_player = pygame.sprite.groupcollide(gc.player_sprite, gc.aliens_bullets, False, True)
-            for _ in alien_bullets_hit_player:
-                gc.player_health -= 10
-                damage.play()
-
-            if gc.player_health <= 0:
-                fon_music.stop()
-                game_over(889, 500)
+            gc.update()
 
             play_pause_button.change_image(pause_button)
             play_pause_button.text = 'PAUSE'

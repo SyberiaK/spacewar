@@ -2,3 +2,6 @@
 .idea
 __pycache__
 venv
+
+### game_data
+data/Result
