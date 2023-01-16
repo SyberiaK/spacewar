@@ -21,17 +21,21 @@ class GameController:
     player_bullets = pygame.sprite.Group()
     aliens_bullets = pygame.sprite.Group()
     textbox = pygame.sprite.Group()
+    coin = pygame.sprite.Group()
 
     score = 0
+    coins = 0
     player_health = 100
     nickname = ''
     timer = 0
+    count = 0
 
     player = None
     current_boss = None
 
     @classmethod
     def spawn_alien(cls):
+        s = str(cls.score)
         if cls.current_boss is None:
             if cls.score >= 1000:
                 cls.current_boss = BossAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites)
@@ -41,6 +45,15 @@ class GameController:
                 MobileAlien(cls.aliens, cls.all_sprites)
             else:
                 RammingAlien(cls.aliens, cls.all_sprites)
+        if 0 <= cls.score <= 9:
+            cls.count = 0
+        elif s[-2] != '0':
+            cls.count = 0
+        if 0 <= cls.score <= 9:
+            cls.count += 1
+        elif s[-2] == '0' and s[-1] == '0' and cls.count == 0:
+            Coin(cls.coin, cls.all_sprites)
+            cls.count += 1
 
     @classmethod
     def alien_reward(cls, alien):
@@ -78,6 +91,10 @@ class GameController:
             cls.player_health -= bullet.damage
             SoundManager.play_sound('player_damage', volume=gs.sound_volume)
 
+        player_get_coin = pygame.sprite.groupcollide(cls.player_sprite, cls.coin, False, True)
+        for _ in player_get_coin:
+            cls.coins += 1
+
         if cls.player_health <= 0:
             SoundManager.stop_sound('background_music')
             cls.player.kill()
@@ -89,8 +106,10 @@ class GameController:
     @classmethod
     def gc_defaults(cls):
         cls.score = 0
+        cls.coins = 0
         cls.player_health = 100
         cls.timer = 0
+        cls.count = 0
 
         cls.player = Player(cls.all_sprites, cls.player_sprite, bullet_group=cls.player_bullets)
         cls.current_boss = None
@@ -221,6 +240,24 @@ def start_screen(width, height):
         SoundManager.play_sound('start_game', volume=gs.music_volume)
         pygame.time.wait(5000)
 
+    def draw_coin_on_start_screen():
+        con = FileManager.load_base('result.db')
+        cur = con.cursor()
+        result_coin = cur.execute("""SELECT Coin FROM score
+                                     WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+        if len(result_coin) == 0:
+            entities = (GameController.nickname, GameController.score, GameController.coins)
+            sql_insert(con, entities)
+            old_coin = 0
+        else:
+            old_coin = result_coin[0][0]
+        coin_draw = SWSprite('coin_draw.png')
+        coin_draw.set_pos(769, 10)
+
+        draw_text(screen, ': ', 45, (811, 13))
+        draw_text(screen, str(old_coin), 45, (839, 15))
+        coin_draw.draw(screen)
+
     start_screen_sprites = pygame.sprite.Group()
 
     SoundManager.load_sound('main_menu_theme', 'start.mp3')
@@ -237,7 +274,7 @@ def start_screen(width, height):
     ba_frames = FileManager.load_gif_frames('start.gif')
     AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
 
-    start_button = UIButton('start.png', start_screen_sprites, text='123456',
+    start_button = UIButton('start.png', start_screen_sprites, text='START',
                             font=pygame.font.SysFont('SPACE MISSION', 50))
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
@@ -257,7 +294,7 @@ def start_screen(width, height):
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
                 if event.key == pygame.K_r:
-                    result()
+                    return result()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     x, y = pygame.mouse.get_pos()
@@ -277,6 +314,7 @@ def start_screen(width, height):
 
         nickname_rendered = profile.render(GameController.nickname, True, pygame.Color('Tomato'))
         screen.blit(nickname_rendered, (50, ui_margin + 5))
+        draw_coin_on_start_screen()
 
         clock.tick(GameSettings.fps)
         pygame.display.flip()
@@ -303,10 +341,15 @@ def game_over(width, height):
     else:
         result_score = cur.execute("""SELECT Score FROM score
                                       WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+        result_coin = cur.execute("""SELECT Coin FROM score
+                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
         old_score = result_score[0][0]
+        old_coin = result_coin[0][0]
         if old_score < GameController.score:
             entities = (GameController.score, GameController.nickname)
-            sql_update(con, entities)
+            sql_update_score(con, entities)
+        entities = (GameController.coins + old_coin, GameController.nickname)
+        sql_update_coin(con, entities)
 
     while True:
         for event in pygame.event.get():
@@ -314,8 +357,6 @@ def game_over(width, height):
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    GameController.score = 0
-                    GameController.player_health = 100
                     main()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
@@ -329,15 +370,24 @@ def game_over(width, height):
 def sql_insert(con, entities):
     cur = con.cursor()
     cur.execute(
-        """INSERT INTO score(Nickname, Score) VALUES(?, ?)""",
+        """INSERT INTO score(Nickname, Score, Coin) VALUES(?, ?, ?)""",
         entities)
     con.commit()
 
 
-def sql_update(con, entities):
+def sql_update_score(con, entities):
     cur = con.cursor()
     cur.execute("""UPDATE score
                    SET Score = ?
+                   WHERE Nickname = ?""",
+                entities)
+    con.commit()
+
+
+def sql_update_coin(con, entities):
+    cur = con.cursor()
+    cur.execute("""UPDATE score
+                   SET Coin = ?
                    WHERE Nickname = ?""",
                 entities)
     con.commit()
@@ -405,7 +455,7 @@ def result():
             if event.type == pygame.QUIT:
                 return start_screen(889, 500)
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_RETURN:
+                if event.key == pygame.K_BACKSPACE:
                     return start_screen(889, 500)
         screen.blit(background, background_rect)
         leader_board(screen, width)
@@ -537,6 +587,13 @@ class BossAlien(SoldierAlien):
                 self.shoot_cooldown = 60
 
 
+class Coin(Alien):
+    def __init__(self, *groups):
+        super().__init__(*groups, image_name='coin.png')
+        self.speed = 3
+        self.direction[1] = 1
+
+
 class Bullet(SWSprite):
     image_names = "bullet_player.png", "bullet_alien.png"
 
@@ -642,6 +699,15 @@ def draw_health(screen, x, y):
     heart.draw(screen)
 
 
+def draw_coin(screen):
+    coin_draw = SWSprite('coin_draw.png')
+    coin_draw.set_pos(580, 47)
+
+    draw_text(screen, ': ', 45, (622, 50))
+    draw_text(screen, str(GameController.coins), 45, (650, 50))
+    coin_draw.draw(screen)
+
+
 def main():
     gc = GameController
     gs = GameSettings
@@ -704,6 +770,7 @@ def main():
             draw_text(screen, "Очки: ", 40, (gs.screen_width * 0.8 - 45, 15))
             draw_text(screen, str(gc.score), 40, (gs.screen_width * 0.8 + 50, 15))
             draw_health(screen, 20, 20)
+            draw_coin(screen)
             clock.tick(gs.fps)
         else:
             play_pause_button.change_image(play_button)
