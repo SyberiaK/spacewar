@@ -274,7 +274,7 @@ def start_screen(width, height):
     ba_frames = FileManager.load_gif_frames('start.gif')
     AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
 
-    start_button = UIButton('start.png', start_screen_sprites, text='START',
+    start_button = UIButton('red_btn.png', start_screen_sprites, text='START',
                             font=pygame.font.SysFont('SPACE MISSION', 50))
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
@@ -730,8 +730,8 @@ def main():
     for _ in range(8):
         RammingAlien(gc.aliens, gc.all_sprites)
 
-    pause_button = FileManager.load_image('pause.png')
-    play_button = FileManager.load_image('play.png')
+    pause_button = FileManager.load_image('yellow_btn.png')
+    play_button = FileManager.load_image('green_btn.png', 'white')
     play_pause_button = UIButton(pause_button, game_ui_sprites, text='PAUSE',
                                  font=pygame.font.SysFont('SPACE MISSION', 40))
     play_pause_button.set_pos(10, 45)
