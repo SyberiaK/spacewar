@@ -25,41 +25,47 @@ class GameController:
 
     score = 0
     coins = 0
-    player_health = 100
     nickname = ''
     timer = 0
-    count = 0
+    current_coin = None
 
     player = None
     current_boss = None
+
+    score_rates = {'ramming': 0, 'mobile': 500, 'soldier': 600, 'elite_soldier': 800, 'boss': 1000}
+    aliens_limit = 8
 
     @classmethod
     def spawn_alien(cls):
         s = str(cls.score)
         if cls.current_boss is None:
-            if cls.score >= 1000:
-                cls.current_boss = BossAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites)
-            elif cls.score >= 600:
+            if cls.score >= cls.score_rates['boss']:
+                for alien in cls.aliens:
+                    alien.kill()
+                cls.current_boss = BossAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites,
+                                             player_to_track=cls.player)
+            elif cls.score >= cls.score_rates['elite_soldier']:
+                EliteSoldierAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites, player_to_track=cls.player)
+            elif cls.score >= cls.score_rates['soldier']:
                 SoldierAlien(cls.aliens_bullets, cls.aliens, cls.all_sprites)
-            elif cls.score >= 500:
+            elif cls.score >= cls.score_rates['mobile']:
                 MobileAlien(cls.aliens, cls.all_sprites)
             else:
                 RammingAlien(cls.aliens, cls.all_sprites)
-        if 0 <= cls.score <= 9:
-            cls.count = 0
-        elif s[-2] != '0':
-            cls.count = 0
-        if 0 <= cls.score <= 9:
-            cls.count += 1
-        elif s[-2] == '0' and s[-1] == '0' and cls.count == 0:
-            Coin(cls.coin, cls.all_sprites)
-            cls.count += 1
+        if cls.current_coin is None and cls.score % 100 == 0:
+            cls.current_coin = Coin(cls.coin, cls.all_sprites)
 
     @classmethod
     def alien_reward(cls, alien):
         if isinstance(alien, BossAlien):
             cls.current_boss = None
             cls.score += 100
+
+            cls.score_rates['soldier'] += 500
+            cls.score_rates['elite_soldier'] += 500
+            cls.score_rates['boss'] += 500
+            for i in range(cls.aliens_limit - 1):
+                cls.spawn_alien()
         else:
             cls.score += 10
 
@@ -83,19 +89,20 @@ class GameController:
             if alien.health <= 0:
                 alien.kill()
                 cls.spawn_alien()
-            cls.player_health -= 20
+            cls.player.health -= 20
             SoundManager.play_sound('player_damage', volume=gs.sound_volume)
 
-        alien_bullets_hit_player = pygame.sprite.groupcollide(cls.aliens_bullets, cls.player_sprite, False, True)
+        alien_bullets_hit_player = pygame.sprite.groupcollide(cls.aliens_bullets, cls.player_sprite, True, False)
         for bullet in alien_bullets_hit_player:
-            cls.player_health -= bullet.damage
+            cls.player.health -= bullet.damage
             SoundManager.play_sound('player_damage', volume=gs.sound_volume)
 
         player_get_coin = pygame.sprite.groupcollide(cls.player_sprite, cls.coin, False, True)
         for _ in player_get_coin:
             cls.coins += 1
+            cls.current_coin = None
 
-        if cls.player_health <= 0:
+        if cls.player.health <= 0:
             SoundManager.stop_sound('background_music')
             cls.player.kill()
             cls.player = None
@@ -105,14 +112,16 @@ class GameController:
 
     @classmethod
     def gc_defaults(cls):
-        cls.score = 0
+        cls.score = 800
         cls.coins = 0
-        cls.player_health = 100
         cls.timer = 0
         cls.count = 0
 
         cls.player = Player(cls.all_sprites, cls.player_sprite, bullet_group=cls.player_bullets)
         cls.current_boss = None
+
+        cls.score_rates = {'ramming': 0, 'mobile': 500, 'soldier': 600, 'elite_soldier': 800, 'boss': 1000}
+        cls.aliens_limit = 8
 
 
 def terminate():
@@ -483,6 +492,7 @@ class UIButton(SWSprite):
 
 
 class Alien(SWSprite):
+    health = 1
     image_variants = 'alien2.png', 'alien3.png'
 
     def __init__(self, *groups, image_name=None):
@@ -490,8 +500,6 @@ class Alien(SWSprite):
             image_name = random.choice(self.image_variants)
 
         super().__init__(image_name, *groups)
-
-        self.health = 1
 
         if GameController.score >= 500:
             self.speed = random.randrange(3, 8)
@@ -538,7 +546,7 @@ class SoldierAlien(MobileAlien):
         self.shoot_cooldown = random.randint(0, 60)
 
     def update(self):
-        if self.rect.centery < self.stop_at:
+        if self.rect.centery < self.stop_at or type(self) is not SoldierAlien:
             super().update()
         elif self.shoot_cooldown <= 0:
             self.shoot()
@@ -548,23 +556,73 @@ class SoldierAlien(MobileAlien):
     def shoot(self):
         if self.shoot_cooldown <= 0:
             Bullet(self, self.rect.centerx, self.rect.bottom, GameController.all_sprites, self.bullet_group,
-                   damage=10, speed=5)
+                   damage=self.bullet_damage, speed=5)
             self.shoot_cooldown = 60
 
 
-class BossAlien(SoldierAlien):
-    def __init__(self, bullet_group, *groups):
-        super().__init__(bullet_group, *groups, image_name='boss.gif')
-        self.health = 15
+class EliteSoldierAlien(SoldierAlien):
+    def __init__(self, bullet_group, *groups, player_to_track, image_name=None):
+        super().__init__(bullet_group, *groups, image_name=image_name)
+        self.attack_speed = 0.5
+
+        self.move_to_x = None
+        self.player_to_track = player_to_track
+
+    def update(self):
+        if self.rect.centery < self.stop_at or type(self) is not EliteSoldierAlien:
+            super().update()
+        else:
+            self.direction[1] = 0
+            if self.shoot_cooldown <= 0:
+                self.shoot()
+            else:
+                if self.shoot_cooldown > 10:
+                    self.follow_player()
+                self.shoot_cooldown -= 1 * self.attack_speed
+
+    def follow_player(self):
+        alien_x = self.pos[0]
+        player_x = self.player_to_track.pos[0]
+        if self.move_to_x is None or abs(alien_x - self.move_to_x) > 5:
+            self.move_to_x = player_x
+            self.direction[0] = 0.5 if alien_x < player_x else -0.5
+        else:
+            self.move_to_x = None
+            self.direction[0] = 0
+        super().update()
+
+
+class BossAlien(EliteSoldierAlien):
+    health = 45
+
+    def __init__(self, bullet_group, *groups, player_to_track):
+        super().__init__(bullet_group, *groups, player_to_track=player_to_track, image_name='boss.gif')
+        self.speed = 8
 
         self.repeat_attack = 3
         self.repeat_cooldown = 0
         self.attack_counter = self.repeat_attack
 
+        self.stage_map = {45: 1, 30: 2, 15: 3}
+        self.current_stage = 1
+
     def update(self):
+        if self.stage_map.get(self.health, None) is not None:
+            new_stage = self.stage_map[self.health]
+            if self.current_stage != new_stage:
+                self.current_stage = new_stage
+                print('Stage changed:', self.current_stage)
         if self.rect.centery < self.stop_at:
             super().update()
-        elif self.shoot_cooldown <= 0:
+        else:
+            self.direction[1] = 0
+            match self.current_stage:
+                case 1: self.first_stage()
+                case 2: self.second_stage()
+                case 3: self.third_stage()
+
+    def first_stage(self):
+        if self.shoot_cooldown <= 0:
             if self.attack_counter == 0:
                 self.attack_counter = self.repeat_attack
             if self.repeat_cooldown <= 0:
@@ -572,19 +630,43 @@ class BossAlien(SoldierAlien):
             else:
                 self.repeat_cooldown -= 1 * self.attack_speed
         else:
+            if self.shoot_cooldown > 10:
+                self.follow_player()
             self.shoot_cooldown -= 1 * self.attack_speed
+
+    def second_stage(self):
+        if abs(self.rect.centerx - (center_x := GameSettings.screen_width // 2)) > 10:
+            self.direction[0] = 0.5 if self.rect.centerx < center_x else -0.5
+            super().update()
+        elif self.shoot_cooldown <= 0:
+            self.spawn_aliens()
+        else:
+            self.shoot_cooldown -= 1 * self.attack_speed
+
+    def third_stage(self):
+        self.second_stage()
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
             Bullet(self, self.rect.centerx - 50, self.rect.bottom, GameController.all_sprites,
-                   self.bullet_group, speed=5)
+                   self.bullet_group, damage=self.bullet_damage, speed=5)
             Bullet(self, self.rect.centerx + 50, self.rect.bottom, GameController.all_sprites,
-                   self.bullet_group, speed=5)
+                   self.bullet_group, damage=self.bullet_damage, speed=5)
             self.attack_counter -= 1
             if self.attack_counter:
                 self.repeat_cooldown = 60 // self.repeat_attack
             else:
                 self.shoot_cooldown = 60
+
+    def spawn_aliens(self):
+        if self.shoot_cooldown <= 0:
+            player_x = self.player_to_track.pos[0]
+            for i in range(-1, 2):
+                r = RammingAlien(GameController.aliens, GameController.all_sprites)
+                r.health = 2
+                r.speed = 15
+                r.set_pos(player_x + 50 * i, -100 + random.uniform(-30, 30))
+            self.shoot_cooldown = 120
 
 
 class Coin(Alien):
@@ -595,18 +677,22 @@ class Coin(Alien):
 
 
 class Bullet(SWSprite):
-    image_names = "bullet_player.png", "bullet_alien.png"
+    image_names = "bullet_player.png", "bullet_alien.png", "bullet_boss.png"
 
     def __init__(self, owner, x: int, y: int, *groups, damage: int = 1, speed: int = 10):
         image_name = ''
         if isinstance(owner, Player):
             image_name = self.image_names[0]
+        elif isinstance(owner, BossAlien):
+            image_name = self.image_names[2]
         elif isinstance(owner, Alien):
             image_name = self.image_names[1]
 
         super().__init__(image_name, *groups)
         if isinstance(owner, Player):
             self.target = Alien
+        elif isinstance(owner, BossAlien):
+            self.target = Player
         elif isinstance(owner, Alien):
             self.target = Player
             self.image = pygame.transform.flip(self.image, False, True)
@@ -625,6 +711,7 @@ class Bullet(SWSprite):
 
 
 class Player(SWSprite):
+    health = 100
     image_name = "spaceX.png"
 
     def __init__(self, *groups, bullet_group, attack_speed: float = 2):
@@ -676,22 +763,17 @@ def draw_text(screen, string, size, pos):
     screen.blit(text, pos)
 
 
-def draw_health(screen, x, y):
-    ui_margin = 5
+def draw_health(screen, entity, x, y, width, height):
+    heart = SWSprite('heart.png')
+    heart.rect.center = x, y + height // 2
 
-    heart = SWSprite('live.png')
-    heart.set_pos(ui_margin, ui_margin)
-
-    width = 200
-    height = 15
-
-    h = max(0, GameController.player_health)
-    health_size = (h / 100) * width
+    h = max(0, entity.health) / type(entity).health
+    health_size = h * width
     fill_line = pygame.Rect(x, y, health_size, height)
     fill_outline = pygame.Rect(x, y, width, height)
-    if h > 50:
+    if h > 0.5:
         pygame.draw.rect(screen, 'green', fill_line)
-    elif 20 < h <= 50:
+    elif h > 0.2:
         pygame.draw.rect(screen, 'dark orange', fill_line)
     else:
         pygame.draw.rect(screen, 'red', fill_line)
@@ -727,14 +809,14 @@ def main():
     SWSprite('screen_fon.png', gc.all_sprites)
 
     gc.gc_defaults()
-    for _ in range(8):
+    for _ in range(gc.aliens_limit):
         RammingAlien(gc.aliens, gc.all_sprites)
 
     pause_button = FileManager.load_image('yellow_btn.png')
     play_button = FileManager.load_image('green_btn.png', 'white')
     play_pause_button = UIButton(pause_button, game_ui_sprites, text='PAUSE',
                                  font=pygame.font.SysFont('SPACE MISSION', 40))
-    play_pause_button.set_pos(10, 45)
+    play_pause_button.set_pos(10, 75)
 
     SoundManager.play_sound('background_music', volume=gs.music_volume, loop=True)
 
@@ -769,8 +851,10 @@ def main():
             gc.all_sprites.draw(screen)
             draw_text(screen, "Очки: ", 40, (gs.screen_width * 0.8 - 45, 15))
             draw_text(screen, str(gc.score), 40, (gs.screen_width * 0.8 + 50, 15))
-            draw_health(screen, 20, 20)
+            draw_health(screen, gc.player, 20, 50, 200, 15)
             draw_coin(screen)
+            if gc.current_boss:
+                draw_health(screen, gc.current_boss, gs.screen_width // 2 - 200, 20, 400, 15)
             clock.tick(gs.fps)
         else:
             play_pause_button.change_image(play_button)
