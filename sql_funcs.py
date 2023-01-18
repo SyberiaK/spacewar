@@ -1,7 +1,7 @@
 def sql_insert(con, entities):
     cur = con.cursor()
     cur.execute(
-        """INSERT INTO score(Nickname, Score, Coin) VALUES(?, ?, ?)""",
+        """INSERT INTO score(Nickname, Score, Coin, spaceX2, spaceX3, spaceX4) VALUES(?, ?, ?, ?, ?, ?)""",
         entities)
     con.commit()
 

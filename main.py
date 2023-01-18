@@ -291,6 +291,7 @@ def shop_screen(screen, event_list):
             elif spaceX4_rect.collidepoint(x, y):
                 shop_spaceX4()
 
+
 def shop():
     screen = pygame.display.set_mode((640, 360))
     pygame.display.set_caption("Space War")
@@ -303,10 +304,8 @@ def shop():
             if event.type == pygame.QUIT:
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    exiting_the_game()
-                if event.key == pygame.K_BACKSPACE:
-                    main()
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    return start_screen(889, 500)
         screen.fill((0, 0, 0))
         screen.blit(background_image, background_rect)
         shop_screen(screen, event_list)
@@ -423,7 +422,7 @@ def game_over(width, height):
     end_screen_sprites = pygame.sprite.Group()
 
     sa_frames = FileManager.load_gif_frames('game_over.gif')
-    AnimatedSprite(sa_frames, end_screen_sprites, frame_rate=5)
+    AnimatedSprite(sa_frames, end_screen_sprites, frame_rate=5, update_rate=gs.fps)
     SoundManager.play_sound('game_over', volume=gs.music_volume)
 
     end_button = UIButton('red_btn.png', end_screen_sprites, text='RETURN',
@@ -526,8 +525,11 @@ def result_screen():
     while True:
         screen.fill((0, 0, 0))
         for event in pygame.event.get():
-            if event.type in [pygame.QUIT, pygame.KEYDOWN]:
-                return start_screen(889, 500)
+            if event.type == pygame.QUIT:
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    return start_screen(889, 500)
         screen.blit(background, background_rect)
         leader_board(screen, width)
         clock.tick(GameSettings.fps)
