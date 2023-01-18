@@ -62,9 +62,10 @@ class GameController:
             cls.current_boss = None
             cls.score += 100
 
-            cls.score_rates['soldier'] += 500
-            cls.score_rates['elite_soldier'] += 500
-            cls.score_rates['boss'] += 500
+            cls.score_rates['mobile'] += 600
+            cls.score_rates['soldier'] += 600
+            cls.score_rates['elite_soldier'] += 600
+            cls.score_rates['boss'] += 600
             for i in range(cls.aliens_limit - 1):
                 cls.spawn_alien()
         else:
@@ -107,8 +108,14 @@ class GameController:
             SoundManager.stop_sound('background_music')
             cls.player.kill()
             cls.player = None
+
             for a in cls.aliens:
                 a.kill()
+            for b in cls.player_bullets:
+                b.kill()
+            for c in cls.aliens_bullets:
+                c.kill()
+
             game_over(889, 500)
 
     @classmethod
@@ -143,7 +150,6 @@ def input_nick():
         GameController.nickname = textbox.text
         main()
 
-    pygame.init()
     screen = pygame.display.set_mode((650, 200))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
@@ -191,9 +197,6 @@ def start_screen(width, height):
 
     start_screen_sprites = pygame.sprite.Group()
 
-    SoundManager.load_sound('main_menu_theme', 'start.mp3')
-    SoundManager.load_sound('start_game', 'start_engine.mp3')
-
     space_war = ['Space War']
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
@@ -213,7 +216,8 @@ def start_screen(width, height):
     icon = UIButton('ikonka.png', start_screen_sprites, text='', font=profile)
     icon.set_pos(ui_margin, ui_margin + 1)
 
-    SoundManager.play_sound('main_menu_theme', volume=gs.music_volume, loop=True)
+    if 'main_menu_theme' not in SoundManager.playing_loops:
+        SoundManager.play_sound('main_menu_theme', volume=gs.music_volume, loop=True)
 
     while True:
         for event in pygame.event.get():
@@ -225,14 +229,13 @@ def start_screen(width, height):
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
                 if event.key == pygame.K_r:
-                    return result()
+                    return result_screen()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     pos = pygame.mouse.get_pos()
                     if start_button.is_clicked(*pos):
                         return to_game()
                     if icon.is_clicked(*pos):
-                        SoundManager.stop_sound('main_menu_theme')
                         return input_nick()
 
         start_screen_sprites.update()
@@ -243,17 +246,16 @@ def start_screen(width, height):
             string_width, string_height = string_rendered.get_size()
             screen.blit(string_rendered, (width // 2 - string_width // 2, ui_margin))
 
-        nickname_rendered = profile.render(GameController.nickname, True, pygame.Color('Tomato'))
+        nickname_rendered = profile.render(gc.nickname, True, pygame.Color('Tomato'))
         screen.blit(nickname_rendered, (50, ui_margin + 5))
         draw_coin_on_start_screen()
 
-        clock.tick(GameSettings.fps)
+        clock.tick(gs.fps)
         pygame.display.flip()
 
 
 def game_over(width, height):
     gc, gs = GameController, GameSettings
-    SoundManager.load_sound('game_over', 'game-over.mp3')
 
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
@@ -347,8 +349,7 @@ def leader_board(screen, width):
         screen.blit(line3_text, [width / 3 + 35, (700 / 11) + i * 5 + 20])
 
 
-def result():
-    pygame.display.set_caption('Space war')
+def result_screen():
     size = width, height = 565, 870
     screen = pygame.display.set_mode(size)
     clock = pygame.time.Clock()
@@ -358,11 +359,8 @@ def result():
     while True:
         screen.fill((0, 0, 0))
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type in [pygame.QUIT, pygame.KEYDOWN]:
                 return start_screen(889, 500)
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_BACKSPACE:
-                    return start_screen(889, 500)
         screen.blit(background, background_rect)
         leader_board(screen, width)
         clock.tick(GameSettings.fps)
@@ -459,8 +457,8 @@ class EliteSoldierAlien(SoldierAlien):
                 self.shoot_cooldown -= 1 * self.attack_speed
 
     def follow_player(self):
-        alien_x = self.pos[0]
-        player_x = self.player_to_track.pos[0]
+        alien_x = self.rect.centerx
+        player_x = self.player_to_track.rect.centerx
         if self.move_to_x is None or abs(alien_x - self.move_to_x) > 5:
             self.move_to_x = player_x
             self.direction[0] = 0.5 if alien_x < player_x else -0.5
@@ -481,6 +479,9 @@ class BossAlien(EliteSoldierAlien):
         self.repeat_cooldown = 0
         self.attack_counter = self.repeat_attack
 
+        self.spawn_ram_cooldown = 0
+        self.spawn_soldier_cooldown = 0
+
         self.stage_map = {45: 1, 30: 2, 15: 3}
         self.current_stage = 1
 
@@ -489,7 +490,6 @@ class BossAlien(EliteSoldierAlien):
             new_stage = self.stage_map[self.health]
             if self.current_stage != new_stage:
                 self.current_stage = new_stage
-                print('Stage changed:', self.current_stage)
         if self.rect.centery < self.stop_at:
             super().update()
         else:
@@ -516,13 +516,23 @@ class BossAlien(EliteSoldierAlien):
         if abs(self.rect.centerx - (center_x := GameSettings.screen_width // 2)) > 10:
             self.direction[0] = 0.5 if self.rect.centerx < center_x else -0.5
             super().update()
-        elif self.shoot_cooldown <= 0:
-            self.spawn_aliens()
+        elif self.spawn_ram_cooldown <= 0:
+            self.spawn_ram()
         else:
-            self.shoot_cooldown -= 1 * self.attack_speed
+            self.spawn_ram_cooldown -= 1 * self.attack_speed
 
     def third_stage(self):
-        self.second_stage()
+        self.first_stage()
+
+        if self.spawn_ram_cooldown <= 0:
+            self.spawn_ram()
+        else:
+            self.spawn_ram_cooldown -= 1 * self.attack_speed
+
+        if self.spawn_soldier_cooldown <= 0:
+            self.spawn_soldier()
+        else:
+            self.spawn_soldier_cooldown -= 1 * self.attack_speed
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
@@ -536,15 +546,24 @@ class BossAlien(EliteSoldierAlien):
             else:
                 self.shoot_cooldown = 60
 
-    def spawn_aliens(self):
-        if self.shoot_cooldown <= 0:
+    def spawn_ram(self):
+        gc = GameController
+        if self.spawn_ram_cooldown <= 0:
             player_x = self.player_to_track.pos[0]
             for i in range(-1, 2):
-                r = RammingAlien(GameController.aliens, GameController.all_sprites)
+                r = RammingAlien(gc.aliens, gc.all_sprites)
                 r.health = 2
                 r.speed = 15
                 r.set_pos(player_x + 50 * i, -100 + random.uniform(-30, 30))
-            self.shoot_cooldown = 120
+            self.spawn_ram_cooldown = 120
+
+    def spawn_soldier(self):
+        gc = GameController
+        if self.spawn_soldier_cooldown <= 0:
+            player_x = self.player_to_track.pos[0]
+            r = SoldierAlien(gc.aliens_bullets, gc.aliens, gc.all_sprites)
+            r.set_pos(player_x, r.pos[1])
+            self.spawn_soldier_cooldown = 240
 
 
 class Coin(Alien):
@@ -641,10 +660,6 @@ def main():
 
     game_ui_sprites = pygame.sprite.Group()
 
-    SoundManager.load_sound('alien_hit', 'strike.mp3')
-    SoundManager.load_sound('background_music', 'fon_sound.mp3')
-    SoundManager.load_sound('player_damage', 'damage.mp3')
-
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     start_screen(889, 500)
@@ -710,4 +725,15 @@ def main():
 
 
 if __name__ == '__main__':
+    pygame.init()
+
+    SoundManager.load_sound('main_menu_theme', 'start.mp3')
+    SoundManager.load_sound('start_game', 'start_engine.mp3')
+
+    SoundManager.load_sound('alien_hit', 'strike.mp3')
+    SoundManager.load_sound('background_music', 'fon_sound.mp3')
+    SoundManager.load_sound('player_damage', 'damage.mp3')
+
+    SoundManager.load_sound('game_over', 'game-over.mp3')
+
     input_nick()
