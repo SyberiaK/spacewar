@@ -390,7 +390,7 @@ def start_screen(width, height):
         result_coin = cur.execute("""SELECT Coin FROM score
                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
         if len(result_coin) == 0:
-            entities = (GameController.nickname, GameController.score, GameController.coins, '0', '0', '0')
+            entities = (GameController.nickname, '0', '0', '0', '0', '0')
             sql_insert(con, entities)
             old_coin = 0
         else:
