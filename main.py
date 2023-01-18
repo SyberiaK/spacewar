@@ -396,6 +396,7 @@ def start_screen(width, height):
                     if resultat_button.is_clicked(*pos):
                         return result_screen()
                     if icon.is_clicked(*pos):
+                        SoundManager.stop_sound('main_menu_theme')
                         return input_nick()
 
         start_screen_sprites.update()
@@ -722,7 +723,10 @@ class BossAlien(EliteSoldierAlien):
             for i in range(-1, 2):
                 r = RammingAlien(gc.aliens, gc.all_sprites)
                 r.health = 2
-                r.speed = 15
+                if GameController.player_plain == "spaceX4.png" or GameController.player_plain == "spaceX3.png":
+                    r.speed = 15
+                else:
+                    r.speed = 10
                 r.set_pos(player_x + 50 * i, -100 + random.uniform(-30, 30))
             self.spawn_ram_cooldown = 120
 

@@ -1,7 +1,6 @@
 import pygame
-from typing import Tuple
 
-from managers import FileManager
+from typing import Tuple
 from sprites import SWSprite
 
 
@@ -62,36 +61,3 @@ class TextInputBox(pygame.sprite.Sprite):
                         self.text += event.unicode
                     self.render_text()
 
-
-'''class CheckBox(SWSprite):
-    def __init__(self, image_active, image_deactive, *groups, default_state: bool = False,
-                 text: str, font: pygame.font.Font, color: Tuple[int, int, int] = (0, 0, 0),
-                 antialias: bool = True):
-        self.image_active = FileManager.load_image(image_active)
-        self.image_deactive = FileManager.load_image(image_deactive)
-        image = self.image_active if default_state else self.image_deactive
-        super().__init__(image, *groups)
-        
-        self.font = font
-        self.text = text
-        self.params = (antialias, color)
-
-        self._state = default_state
-        
-        if self.text:
-            self.rect 
-    
-    @property
-    def state(self): 
-        return self._state
-
-    def change_state(self):
-        self._state = not self.state
-        self.image = self.image_active if self.state else self.image_deactive
-        
-    def update(self, event_list):
-        for event in event_list:
-            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                if self.rect.collidepoint(event.pos):
-                    self.change_state()
-            self.render_text()'''
