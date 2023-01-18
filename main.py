@@ -29,6 +29,9 @@ class GameController:
     coins = 0
     nickname = ''
     timer = 0
+    count = 0
+    player_plain = 'spaceX.png'
+    pos = [40, 180]
     current_coin = None
 
     player = None
@@ -169,6 +172,148 @@ def input_nick():
         pygame.display.flip()
 
 
+def shop_screen(screen, event_list):
+    d = {'spaceX2': 25, 'spaceX3': 50, 'spaceX4': 100}
+    con = FileManager.load_base('result.db')
+    cur = con.cursor()
+    result_score = cur.execute("""SELECT Coin FROM score
+                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+    result_spaceX2 = cur.execute("""SELECT spaceX2 FROM score
+                                        WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+    spaceX2 = result_spaceX2[0][0]
+    result_spaceX3 = cur.execute("""SELECT spaceX3 FROM score
+                                        WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+    spaceX3 = result_spaceX3[0][0]
+    result_spaceX4 = cur.execute("""SELECT spaceX4 FROM score
+                                        WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+    spaceX4 = result_spaceX4[0][0]
+
+    coin = result_score[0][0]
+
+    def draw_text(string, size, p):
+        font = pygame.font.SysFont('SPACE MISSION', size)
+        text = font.render(string, True, 'yellow')
+        screen.blit(text, p)
+
+    def shop_spaceX():
+        GameController.player_plain = 'spaceX.png'
+        GameController.pos = [40, 180]
+
+    def shop_spaceX2():
+        if spaceX2 == 0:
+            if coin - d.get('spaceX2') >= 0:
+                cur.execute("""UPDATE score
+                               SET spaceX2 = 1
+                               WHERE Nickname = ?""", (GameController.nickname,))
+                cur.execute("""UPDATE score
+                               SET Coin = ?
+                               WHERE Nickname = ?""", (coin - d.get('spaceX2'), GameController.nickname,))
+                con.commit()
+        else:
+            GameController.player_plain = 'spaceX2.png'
+            GameController.pos = [195, 180]
+
+
+    def shop_spaceX3():
+        if spaceX3 == 0:
+            if coin - d.get('spaceX3') >= 0:
+                cur.execute("""UPDATE score
+                               SET spaceX3 = 1
+                               WHERE Nickname = ?""", (GameController.nickname,))
+                cur.execute("""UPDATE score
+                               SET Coin = ?
+                               WHERE Nickname = ?""", (coin - d.get('spaceX3'), GameController.nickname,))
+                con.commit()
+        else:
+            GameController.player_plain = 'spaceX3.png'
+            GameController.pos = [360, 180]
+
+    def shop_spaceX4():
+        if spaceX4 == 0:
+            if coin - d.get('spaceX4') >= 0:
+                cur.execute("""UPDATE score
+                               SET spaceX4 = 1
+                               WHERE Nickname = ?""", (GameController.nickname,))
+                cur.execute("""UPDATE score
+                               SET Coin = ?
+                               WHERE Nickname = ?""", (coin - d.get('spaceX4'), GameController.nickname,))
+                con.commit()
+        else:
+            GameController.player_plain = 'spaceX4.png'
+            GameController.pos = [530, 180]
+
+    coin_draw = SWSprite('coin_draw.png')
+    coin_draw_count = SWSprite('coin.png')
+    ok = SWSprite('ok.png')
+    spaceX = FileManager.load_image('spaceX.png')
+    spaceX_rect = spaceX.get_rect()
+    spaceX_rect.x, spaceX_rect.y = 10, 50
+    spaceX2_im = FileManager.load_image('spaceX2_shop.png')
+    spaceX2_rect = spaceX2_im.get_rect()
+    spaceX2_rect.x, spaceX2_rect.y = 125, 5
+    spaceX3_im = FileManager.load_image('spaceX3_shop.png')
+    spaceX3_rect = spaceX3_im.get_rect()
+    spaceX3_rect.x, spaceX3_rect.y = 295, 5
+    spaceX4_im = FileManager.load_image('spaceX4_shop.png')
+    spaceX4_rect = spaceX4_im.get_rect()
+    spaceX4_rect.x, spaceX4_rect.y = 468, 5
+    screen.blit(spaceX, [10, 50])
+    screen.blit(spaceX2_im, [125, 5])
+    screen.blit(spaceX3_im, [295, 5])
+    screen.blit(spaceX4_im, [468, 5])
+    coin_draw_count.set_pos(10, 305)
+    coin_draw_count.draw(screen)
+    draw_text(': ', 50, (58, 310))
+    draw_text(str(coin), 45, (78, 315))
+    ok.set_pos(*GameController.pos)
+    ok.draw(screen)
+    if spaceX2 == 0:
+        coin_draw.set_pos(170, 180)
+        coin_draw.draw(screen)
+        draw_text(': 25', 40, (210, 185))
+    if spaceX3 == 0:
+        coin_draw.set_pos(330, 180)
+        coin_draw.draw(screen)
+        draw_text(': 50', 40, (370, 185))
+    if spaceX4 == 0:
+        coin_draw.set_pos(487, 180)
+        coin_draw.draw(screen)
+        draw_text(': 100', 40, (527, 185))
+    for event in event_list:
+        x, y = pygame.mouse.get_pos()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if spaceX_rect.collidepoint(x, y):
+                shop_spaceX()
+            elif spaceX2_rect.collidepoint(x, y):
+                shop_spaceX2()
+            elif spaceX3_rect.collidepoint(x, y):
+                shop_spaceX3()
+            elif spaceX4_rect.collidepoint(x, y):
+                shop_spaceX4()
+
+def shop():
+    screen = pygame.display.set_mode((640, 360))
+    pygame.display.set_caption("Space War")
+    clock = pygame.time.Clock()
+    background_image = FileManager.load_image('fon_shop.png')
+    background_rect = background_image.get_rect()
+    while True:
+        event_list = pygame.event.get()
+        for event in event_list:
+            if event.type == pygame.QUIT:
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    exiting_the_game()
+                if event.key == pygame.K_BACKSPACE:
+                    main()
+        screen.fill((0, 0, 0))
+        screen.blit(background_image, background_rect)
+        shop_screen(screen, event_list)
+        clock.tick(GameSettings.fps)
+        pygame.display.flip()
+
+
 def start_screen(width, height):
     gc, gs = GameController, GameSettings
 
@@ -183,7 +328,7 @@ def start_screen(width, height):
         result_coin = cur.execute("""SELECT Coin FROM score
                                      WHERE Nickname = ?""", (gc.nickname,)).fetchall()
         if len(result_coin) == 0:
-            entities = (gc.nickname, gc.score, gc.coins)
+            entities = (gc.nickname, gc.score, gc.coins, '0', '0', '0')
             sql_insert(con, entities)
             old_coin = 0
         else:
@@ -213,6 +358,16 @@ def start_screen(width, height):
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
 
+    shop_button = UIButton('yellow_btn.png', start_screen_sprites, text='SHOP',
+                            font=pygame.font.SysFont('SPACE MISSION', 50))
+    shop_button.rect.centerx = width - 100
+    shop_button.rect.bottom = height - ui_margin
+
+    resultat_button = UIButton('green_btn.png', start_screen_sprites, text='SCORE',
+                               font=pygame.font.SysFont('SPACE MISSION', 50))
+    resultat_button.rect.centerx = 100
+    resultat_button.rect.bottom = height - ui_margin
+
     icon = UIButton('ikonka.png', start_screen_sprites, text='', font=profile)
     icon.set_pos(ui_margin, ui_margin + 1)
 
@@ -230,11 +385,17 @@ def start_screen(width, height):
                     exiting_the_game()
                 if event.key == pygame.K_r:
                     return result_screen()
+                if event.key == pygame.K_m:
+                    return shop()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     pos = pygame.mouse.get_pos()
                     if start_button.is_clicked(*pos):
                         return to_game()
+                    if shop_button.is_clicked(*pos):
+                        return shop()
+                    if resultat_button.is_clicked(*pos):
+                        return result_screen()
                     if icon.is_clicked(*pos):
                         return input_nick()
 
@@ -259,31 +420,32 @@ def game_over(width, height):
 
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
+    end_screen_sprites = pygame.sprite.Group()
 
     sa_frames = FileManager.load_gif_frames('game_over.gif')
-    screen_animation = AnimatedSprite(sa_frames, frame_rate=5, update_rate=gs.fps)
+    AnimatedSprite(sa_frames, end_screen_sprites, frame_rate=5)
     SoundManager.play_sound('game_over', volume=gs.music_volume)
+
+    end_button = UIButton('red_btn.png', end_screen_sprites, text='RETURN',
+                            font=pygame.font.SysFont('SPACE MISSION', 50))
+    end_button.rect.centerx = width // 2
+    end_button.rect.bottom = height - 10
 
     con = FileManager.load_base('result.db')
     cur = con.cursor()
-    result = cur.execute("""SELECT Nickname FROM score
-                            WHERE Nickname = ?""", (gc.nickname,)).fetchall()
 
-    if len(result) == 0:
-        entities = (gc.nickname, gc.score)
-        sql_insert(con, entities)
-    else:
-        result_score = cur.execute("""SELECT Score FROM score
-                                      WHERE Nickname = ?""", (gc.nickname,)).fetchall()
-        result_coin = cur.execute("""SELECT Coin FROM score
-                                      WHERE Nickname = ?""", (gc.nickname,)).fetchall()
-        old_score = result_score[0][0]
-        old_coin = result_coin[0][0]
-        if old_score < gc.score:
-            entities = (gc.score, gc.nickname)
-            sql_update_score(con, entities)
-        entities = (gc.coins + old_coin, gc.nickname)
-        sql_update_coin(con, entities)
+    result_score = cur.execute("""SELECT Score FROM score
+                                  WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+    result_coin = cur.execute("""SELECT Coin FROM score
+                                  WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+
+    old_score = result_score[0][0]
+    old_coin = result_coin[0][0]
+    if old_score < gc.score:
+        entities = (gc.score, gc.nickname)
+        sql_update_score(con, entities)
+    entities = (gc.coins + old_coin, gc.nickname)
+    sql_update_coin(con, entities)
 
     while True:
         for event in pygame.event.get():
@@ -294,9 +456,14 @@ def game_over(width, height):
                     main()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    x, y = pygame.mouse.get_pos()
+                    if end_button.is_clicked(x, y):
+                        return main()
 
-        screen_animation.update()
-        screen_animation.draw(screen)
+        end_screen_sprites.update()
+        end_screen_sprites.draw(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
@@ -609,10 +776,20 @@ class Bullet(SWSprite):
 
 class Player(SWSprite):
     health = 100
-    image_name = "spaceX.png"
+    image_names = "spaceX.png", "spaceX2.png", "spaceX3.png", "spaceX4.png"
 
     def __init__(self, *groups, bullet_group, attack_speed: float = 2):
-        super().__init__(self.image_name, *groups)
+        image_name = ''
+        if GameController.player_plain == 'spaceX.png':
+            image_name = self.image_names[0]
+        elif GameController.player_plain == 'spaceX2.png':
+            image_name = self.image_names[1]
+        elif GameController.player_plain == 'spaceX3.png':
+            image_name = self.image_names[2]
+        elif GameController.player_plain == 'spaceX4.png':
+            image_name = self.image_names[3]
+
+        super().__init__(image_name, *groups)
         self.bullet_group = bullet_group
 
         self.speed = 8
@@ -650,7 +827,27 @@ class Player(SWSprite):
 
     def shoot(self):
         if self.shoot_cooldown <= 0:
-            Bullet(self, self.rect.centerx, self.rect.top, GameController.all_sprites, self.bullet_group)
+            if GameController.player_plain == 'spaceX.png':
+                Bullet(self, self.rect.centerx, self.rect.top, GameController.all_sprites, self.bullet_group)
+            elif GameController.player_plain == 'spaceX2.png':
+                Bullet(self, self.rect.centerx - 5, self.rect.top, GameController.all_sprites, self.bullet_group)
+                Bullet(self, self.rect.centerx + 5, self.rect.top, GameController.all_sprites, self.bullet_group)
+            elif GameController.player_plain == 'spaceX3.png':
+                Bullet(self, self.rect.centerx - 30, self.rect.centery + 5, GameController.all_sprites,
+                       self.bullet_group)
+                Bullet(self, self.rect.centerx + 30, self.rect.centery + 5, GameController.all_sprites,
+                       self.bullet_group)
+                Bullet(self, self.rect.centerx, self.rect.top, GameController.all_sprites, self.bullet_group)
+            elif GameController.player_plain == 'spaceX4.png':
+                Bullet(self, self.rect.centerx, self.rect.top, GameController.all_sprites, self.bullet_group)
+                Bullet(self, self.rect.centerx - 30, self.rect.centery + 15, GameController.all_sprites,
+                       self.bullet_group)
+                Bullet(self, self.rect.centerx + 30, self.rect.centery + 15, GameController.all_sprites,
+                       self.bullet_group)
+                Bullet(self, self.rect.centerx - 45, self.rect.centery + 30, GameController.all_sprites,
+                       self.bullet_group)
+                Bullet(self, self.rect.centerx + 45, self.rect.centery + 30, GameController.all_sprites,
+                       self.bullet_group)
             self.shoot_cooldown = 60
 
 
