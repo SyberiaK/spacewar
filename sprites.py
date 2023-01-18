@@ -43,3 +43,46 @@ class SWSprite(Sprite):
 
     def draw(self, surface):
         surface.blit(self.image, self.rect)
+
+
+class AnimatedSprite(Sprite):
+    def __init__(self, frames, *groups, frame_rate: int, update_rate: int):
+        super().__init__(*groups)
+        self.frames = frames
+        self.frame_rate = frame_rate
+        self.update_rate = update_rate
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        self.rect = self.image.get_rect()
+
+    def update(self):
+        frame_step = self.update_rate // self.frame_rate
+        self.cur_frame += 1
+        if self.cur_frame >= len(self.frames) * frame_step:
+            self.cur_frame = 0
+        self.image = self.frames[self.cur_frame // frame_step]
+
+    def change_frames(self, frames):
+        self.frames = frames
+        self.cur_frame = 0
+        self.image = self.frames[self.cur_frame]
+        pos = self.pos
+        self.rect = self.image.get_rect()
+        self.set_pos(*pos)
+
+    @property
+    def pos(self):
+        return self.rect.topleft
+
+    @property
+    def size(self):
+        return self.rect.size
+
+    def move(self, x, y):
+        self.rect = self.rect.move(x, y)
+
+    def set_pos(self, x, y):
+        self.rect.topleft = x, y
+
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)

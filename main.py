@@ -1,15 +1,17 @@
 import os
 import random
-from typing import Tuple
 from tkinter import Tk, messagebox
 from operator import itemgetter
 
 import pygame
 import sys
 
+from draw import draw_coin, draw_health, draw_text
 from managers import FileManager, SoundManager
 from settings import GameSettings
-from swsprite import SWSprite
+from sql_funcs import sql_insert, sql_update_score, sql_update_coin
+from sprites import AnimatedSprite, SWSprite
+from ui import TextInputBox, UIButton
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 
@@ -37,7 +39,6 @@ class GameController:
 
     @classmethod
     def spawn_alien(cls):
-        s = str(cls.score)
         if cls.current_boss is None:
             if cls.score >= cls.score_rates['boss']:
                 for alien in cls.aliens:
@@ -112,11 +113,11 @@ class GameController:
 
     @classmethod
     def gc_defaults(cls):
-        cls.score = 800
+        cls.score = 0
         cls.coins = 0
         cls.timer = 0
-        cls.count = 0
 
+        cls.current_coin = None
         cls.player = Player(cls.all_sprites, cls.player_sprite, bullet_group=cls.player_bullets)
         cls.current_boss = None
 
@@ -137,95 +138,16 @@ def exiting_the_game():
         terminate()
 
 
-class AnimatedSprite(pygame.sprite.Sprite):
-    def __init__(self, frames, *groups, frame_rate: int):
-        super().__init__(*groups)
-        self.frames = frames
-        self.frame_rate = frame_rate
-        self.cur_frame = 0
-        self.image = self.frames[self.cur_frame]
-        self.rect = self.image.get_rect()
-
-    def update(self):
-        frame_step = GameSettings.fps // self.frame_rate
-        self.cur_frame += 1
-        if self.cur_frame >= len(self.frames) * frame_step:
-            self.cur_frame = 0
-        self.image = self.frames[self.cur_frame // frame_step]
-
-    def change_frames(self, frames):
-        self.frames = frames
-        self.cur_frame = 0
-        self.image = self.frames[self.cur_frame]
-        pos = self.pos
-        self.rect = self.image.get_rect()
-        self.set_pos(*pos)
-
-    @property
-    def pos(self):
-        return self.rect.topleft
-
-    @property
-    def size(self):
-        return self.rect.size
-
-    def move(self, x, y):
-        self.rect = self.rect.move(x, y)
-
-    def set_pos(self, x, y):
-        self.rect.topleft = x, y
-
-    def draw(self, surface):
-        surface.blit(self.image, self.rect)
-
-
-class TextInputBox(pygame.sprite.Sprite):
-    def __init__(self):
-        super().__init__(GameController.textbox)
-        self.color = pygame.Color('white')
-        self.pos = (50, 50)
-        self.width = 550
-        self.font = pygame.font.SysFont('SPACE MISSION', 100)
-        self.cursor = False
-        self.text = "Введите ник ..."
-        self.render_text()
-
-    def render_text(self):
-        if len(self.text) > 11:
-            self.text = self.text[:-1]
-        text_surf = self.font.render(self.text, True, pygame.Color('DodgerBlue'))
-        self.image = pygame.Surface((self.width + 10, text_surf.get_height() + 10))
-        self.image.blit(text_surf, (10, 10))
-        pygame.draw.rect(self.image, self.color, self.image.get_rect(), 3)
-        self.rect = self.image.get_rect(topleft=self.pos)
-
-    def update(self, event_list):
-        for event in event_list:
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if not self.cursor:
-                    self.text = ""
-                    self.cursor = self.rect.collidepoint(event.pos)
-            if event.type == pygame.KEYDOWN:
-                if self.cursor:
-                    if event.key == pygame.K_RETURN:
-                        if len(self.text) == 0 or self.text == "Введите ник":
-                            pass
-                        else:
-                            GameController.nickname = self.text
-                            main()
-                    elif event.key == pygame.K_BACKSPACE:
-                        self.text = self.text[:-1]
-                    else:
-                        self.text += event.unicode
-                    self.render_text()
-
-
 def input_nick():
+    def on_nick_enter(textbox):
+        GameController.nickname = textbox.text
+        main()
+
     pygame.init()
     screen = pygame.display.set_mode((650, 200))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    box = TextInputBox()
+    box = TextInputBox(GameController.textbox, on_enter=on_nick_enter)
     background_image = FileManager.load_image('screen_fon.png')
     background_rect = background_image.get_rect()
     while True:
@@ -242,7 +164,7 @@ def input_nick():
 
 
 def start_screen(width, height):
-    gs = GameSettings
+    gc, gs = GameController, GameSettings
 
     def to_game():
         SoundManager.stop_sound('main_menu_theme')
@@ -253,9 +175,9 @@ def start_screen(width, height):
         con = FileManager.load_base('result.db')
         cur = con.cursor()
         result_coin = cur.execute("""SELECT Coin FROM score
-                                     WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+                                     WHERE Nickname = ?""", (gc.nickname,)).fetchall()
         if len(result_coin) == 0:
-            entities = (GameController.nickname, GameController.score, GameController.coins)
+            entities = (gc.nickname, gc.score, gc.coins)
             sql_insert(con, entities)
             old_coin = 0
         else:
@@ -281,10 +203,10 @@ def start_screen(width, height):
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
     profile = pygame.font.SysFont('SPACE MISSION', 50)
     ba_frames = FileManager.load_gif_frames('start.gif')
-    AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10)
+    AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10, update_rate=gs.fps)
 
     start_button = UIButton('red_btn.png', start_screen_sprites, text='START',
-                            font=pygame.font.SysFont('SPACE MISSION', 50))
+                            font=profile)
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
 
@@ -306,12 +228,12 @@ def start_screen(width, height):
                     return result()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
-                    x, y = pygame.mouse.get_pos()
-                    if start_button.is_clicked(x, y):
+                    pos = pygame.mouse.get_pos()
+                    if start_button.is_clicked(*pos):
                         return to_game()
-                    if icon.is_clicked(x, y):
+                    if icon.is_clicked(*pos):
                         SoundManager.stop_sound('main_menu_theme')
-                        input_nick()
+                        return input_nick()
 
         start_screen_sprites.update()
         start_screen_sprites.draw(screen)
@@ -330,34 +252,35 @@ def start_screen(width, height):
 
 
 def game_over(width, height):
+    gc, gs = GameController, GameSettings
     SoundManager.load_sound('game_over', 'game-over.mp3')
 
     screen = pygame.display.set_mode((width, height))
     clock = pygame.time.Clock()
 
     sa_frames = FileManager.load_gif_frames('game_over.gif')
-    screen_animation = AnimatedSprite(sa_frames, frame_rate=5)
-    SoundManager.play_sound('game_over', volume=GameSettings.music_volume)
+    screen_animation = AnimatedSprite(sa_frames, frame_rate=5, update_rate=gs.fps)
+    SoundManager.play_sound('game_over', volume=gs.music_volume)
 
     con = FileManager.load_base('result.db')
     cur = con.cursor()
     result = cur.execute("""SELECT Nickname FROM score
-                            WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+                            WHERE Nickname = ?""", (gc.nickname,)).fetchall()
 
     if len(result) == 0:
-        entities = (GameController.nickname, GameController.score)
+        entities = (gc.nickname, gc.score)
         sql_insert(con, entities)
     else:
         result_score = cur.execute("""SELECT Score FROM score
-                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+                                      WHERE Nickname = ?""", (gc.nickname,)).fetchall()
         result_coin = cur.execute("""SELECT Coin FROM score
-                                      WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
+                                      WHERE Nickname = ?""", (gc.nickname,)).fetchall()
         old_score = result_score[0][0]
         old_coin = result_coin[0][0]
-        if old_score < GameController.score:
-            entities = (GameController.score, GameController.nickname)
+        if old_score < gc.score:
+            entities = (gc.score, gc.nickname)
             sql_update_score(con, entities)
-        entities = (GameController.coins + old_coin, GameController.nickname)
+        entities = (gc.coins + old_coin, gc.nickname)
         sql_update_coin(con, entities)
 
     while True:
@@ -374,32 +297,6 @@ def game_over(width, height):
         screen_animation.draw(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
-
-
-def sql_insert(con, entities):
-    cur = con.cursor()
-    cur.execute(
-        """INSERT INTO score(Nickname, Score, Coin) VALUES(?, ?, ?)""",
-        entities)
-    con.commit()
-
-
-def sql_update_score(con, entities):
-    cur = con.cursor()
-    cur.execute("""UPDATE score
-                   SET Score = ?
-                   WHERE Nickname = ?""",
-                entities)
-    con.commit()
-
-
-def sql_update_coin(con, entities):
-    cur = con.cursor()
-    cur.execute("""UPDATE score
-                   SET Coin = ?
-                   WHERE Nickname = ?""",
-                entities)
-    con.commit()
 
 
 def leader_board(screen, width):
@@ -470,25 +367,6 @@ def result():
         leader_board(screen, width)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
-
-
-class UIButton(SWSprite):
-    def __init__(self, image: str | pygame.Surface, *groups,
-                 text: str, font: pygame.font.Font, color: Tuple[int, int, int] = (0, 0, 0),
-                 antialias: bool = True):
-        super().__init__(image, *groups)
-        self.font = font
-        self.text = text
-        self.params = (antialias, color)
-
-    def is_clicked(self, x, y):
-        return self.rect.collidepoint(x, y)
-
-    def update(self):
-        t = self.font.render(self.text, *self.params)
-        text_width, text_height = t.get_size()
-        text_pos = self.rect.width // 2 - text_width // 2, self.rect.height // 2 - text_height // 2
-        self.image.blit(t, text_pos)
 
 
 class Alien(SWSprite):
@@ -757,39 +635,6 @@ class Player(SWSprite):
             self.shoot_cooldown = 60
 
 
-def draw_text(screen, string, size, pos):
-    font = pygame.font.SysFont('SPACE MISSION', size)
-    text = font.render(string, True, (0, 255, 0))
-    screen.blit(text, pos)
-
-
-def draw_health(screen, entity, x, y, width, height):
-    heart = SWSprite('heart.png')
-    heart.rect.center = x, y + height // 2
-
-    h = max(0, entity.health) / type(entity).health
-    health_size = h * width
-    fill_line = pygame.Rect(x, y, health_size, height)
-    fill_outline = pygame.Rect(x, y, width, height)
-    if h > 0.5:
-        pygame.draw.rect(screen, 'green', fill_line)
-    elif h > 0.2:
-        pygame.draw.rect(screen, 'dark orange', fill_line)
-    else:
-        pygame.draw.rect(screen, 'red', fill_line)
-    pygame.draw.rect(screen, 'red', fill_outline, 2)
-    heart.draw(screen)
-
-
-def draw_coin(screen):
-    coin_draw = SWSprite('coin_draw.png')
-    coin_draw.set_pos(580, 47)
-
-    draw_text(screen, ': ', 45, (622, 50))
-    draw_text(screen, str(GameController.coins), 45, (650, 50))
-    coin_draw.draw(screen)
-
-
 def main():
     gc = GameController
     gs = GameSettings
@@ -852,7 +697,7 @@ def main():
             draw_text(screen, "Очки: ", 40, (gs.screen_width * 0.8 - 45, 15))
             draw_text(screen, str(gc.score), 40, (gs.screen_width * 0.8 + 50, 15))
             draw_health(screen, gc.player, 20, 50, 200, 15)
-            draw_coin(screen)
+            draw_coin(screen, gc.coins)
             if gc.current_boss:
                 draw_health(screen, gc.current_boss, gs.screen_width // 2 - 200, 20, 400, 15)
             clock.tick(gs.fps)
