@@ -129,7 +129,7 @@ class GameController:
 
     @classmethod
     def gc_defaults(cls):
-        cls.score = 1000
+        cls.score = 0
         cls.coins = 0
         cls.timer = 0
 
@@ -253,7 +253,6 @@ def shop_screen(screen, event_list):
             GameController.player_plain = 'spaceX4.png'
             GameController.pos = [530, 180]
 
-    ui_margin = 5
 
     shop_ui = pygame.sprite.Group()
 
@@ -272,11 +271,6 @@ def shop_screen(screen, event_list):
     space_x4_spr = SWSprite('spaceX4_shop.png', shop_ui)
     space_x4_spr.set_pos(468, 5)
 
-    return_button = UIButton('red_btn.png', shop_ui, text='RETURN',
-                             font=pygame.font.SysFont('SPACE MISSION', 50))
-    return_button.set_pos(screen.get_width() - return_button.size[0] - ui_margin,
-                          screen.get_height() - return_button.size[1] - ui_margin)
-
     if space_x2 == 0:
         SWSprite('coin_draw.png', shop_ui).set_pos(170, 180)
         _draw_text(': 25', 40, (210, 185))
@@ -294,25 +288,32 @@ def shop_screen(screen, event_list):
 
     for event in event_list:
         if event.type == pygame.MOUSEBUTTONDOWN:
-            pos = pygame.mouse.get_pos()
-            if space_x_spr.rect.collidepoint(*pos):
-                shop_space_x()
-            elif space_x2_spr.rect.collidepoint(*pos):
-                shop_space_x2()
-            elif space_x3_spr.rect.collidepoint(*pos):
-                shop_space_x3()
-            elif space_x4_spr.rect.collidepoint(*pos):
-                shop_space_x4()
-            if return_button.is_clicked(*pos):
-                return
+            if event.button == 1:
+                pos = pygame.mouse.get_pos()
+                if space_x_spr.rect.collidepoint(*pos):
+                    shop_space_x()
+                elif space_x2_spr.rect.collidepoint(*pos):
+                    shop_space_x2()
+                elif space_x3_spr.rect.collidepoint(*pos):
+                    shop_space_x3()
+                elif space_x4_spr.rect.collidepoint(*pos):
+                    shop_space_x4()
 
 
 def shop():
+    ui_margin = 5
+
     screen = pygame.display.set_mode((640, 360))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
     background_image = FileManager.load_image('fon_shop.png')
     background_rect = background_image.get_rect()
+
+    return_button = UIButton('red_btn.png', text='RETURN',
+                             font=pygame.font.SysFont('SPACE MISSION', 50))
+    return_button.set_pos(screen.get_width() - return_button.size[0] - ui_margin,
+                          screen.get_height() - return_button.size[1] - ui_margin)
+
     while True:
         event_list = pygame.event.get()
         for event in event_list:
@@ -321,9 +322,17 @@ def shop():
             if event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     return
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    pos = pygame.mouse.get_pos()
+                    if return_button.is_clicked(*pos):
+                        return
+
         screen.fill((0, 0, 0))
         screen.blit(background_image, background_rect)
         shop_screen(screen, event_list)
+        return_button.update()
+        return_button.draw(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
@@ -344,14 +353,15 @@ def start_screen(width, height):
 
         start_ticks = pygame.time.get_ticks()
         while True:
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
+            for _event in pygame.event.get():
+                if _event.type == pygame.QUIT:
                     exiting_the_game()
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_ESCAPE:
+                if _event.type == pygame.KEYDOWN:
+                    if _event.key == pygame.K_ESCAPE:
                         exiting_the_game()
             start_timer = math.ceil(5 - ((pygame.time.get_ticks() - start_ticks) / 1000))
             if start_timer <= 0:
+                main()
                 break
 
             start_screen_sprites.update()
@@ -428,7 +438,7 @@ def start_screen(width, height):
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    return to_game()
+                    to_game()
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
                 if event.key == pygame.K_r:
@@ -439,7 +449,7 @@ def start_screen(width, height):
                 if event.button == 1:
                     pos = pygame.mouse.get_pos()
                     if start_button.is_clicked(*pos):
-                        return to_game()
+                        to_game()
                     if shop_button.is_clicked(*pos):
                         shop()
                         screen = pygame.display.set_mode((width, height))
@@ -541,7 +551,7 @@ def leader_board(screen, width):
         screen.blit(title1, [width / 7 + 20, (700 / 16)])
         screen.blit(title2, [width / 7 + 280, (700 / 16)])
         count = 1
-        result.sort(key=itemgetter(1), reverse=True)
+        result.sort(key=lambda x: x[1], reverse=True)
         for row in result:
             if count == 1:
                 column0 = top_font_style.render(f"{str(count)}.", True, green)
@@ -915,7 +925,6 @@ class Player(SWSprite):
 
 
 def main():
-    start_screen(889, 500)
 
     gc = GameController
     gs = GameSettings
@@ -999,4 +1008,4 @@ if __name__ == '__main__':
     SoundManager.load_sound('game_over', 'game-over.mp3')
 
     input_nick()
-    main()
+    start_screen(889, 500)
