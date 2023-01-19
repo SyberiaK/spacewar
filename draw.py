@@ -3,12 +3,14 @@ import pygame
 from sprites import SWSprite
 
 
+"Функция, для отрисовки текста и количество очков"
 def draw_text(screen, string, size, pos):
     font = pygame.font.SysFont('SPACE MISSION', size)
     text = font.render(string, True, (0, 255, 0))
     screen.blit(text, pos)
 
 
+"Функция, для отрисовки уровня здоровья"
 def draw_health(screen, entity, x, y, width, height):
     heart = SWSprite('heart.png')
     heart.rect.center = x, y + height // 2
@@ -27,6 +29,7 @@ def draw_health(screen, entity, x, y, width, height):
     heart.draw(screen)
 
 
+"Функция, для отрисовки количества монет"
 def draw_coin(screen, count):
     coin_draw = SWSprite('coin_draw.png')
     coin_draw.set_pos(580, 47)

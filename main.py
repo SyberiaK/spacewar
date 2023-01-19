@@ -16,6 +16,7 @@ from ui import TextInputBox, UIButton
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 
 
+"Класс, контролирующий игру: спавн пришельцов и монет, соприкосновения, отправка на экран смерти"
 class GameController:
     all_sprites = pygame.sprite.Group()
     aliens = pygame.sprite.Group()
@@ -135,11 +136,13 @@ class GameController:
         cls.aliens_limit = 8
 
 
+"Выход из игры"
 def terminate():
     pygame.quit()
     sys.exit()
 
 
+"Подтверждение о выходе"
 def exiting_the_game():
     Tk().withdraw()
     answer = messagebox.askyesno(title="Подтверждение о выходе", message="Вы хотите выйти из игры?")
@@ -148,6 +151,7 @@ def exiting_the_game():
         terminate()
 
 
+"Запуск класса ввода ника"
 def input_nick():
     def on_nick_enter(textbox):
         GameController.nickname = textbox.text
@@ -172,6 +176,8 @@ def input_nick():
         pygame.display.flip()
 
 
+"Экран магазина: отрисовка монет, покупка кораблей, проверка на количество монет, обновление базы данных," \
+"отрисовка выбора корабля"
 def shop_screen(screen, event_list):
     d = {'spaceX2': 25, 'spaceX3': 50, 'spaceX4': 100}
     con = FileManager.load_base('result.db')
@@ -292,7 +298,59 @@ def shop_screen(screen, event_list):
                 shop_spaceX4()
 
 
+"Запуск функции магазина, установка фона и кнопки"
 def shop():
+    screen = pygame.display.set_mode((640, 360))
+    pygame.display.set_caption("Space War")
+    clock = pygame.time.Clock()
+    shop_screen_sprites = pygame.sprite.Group()
+    background_image = FileManager.load_image('fon_shop.png')
+    background_rect = background_image.get_rect()
+
+    donat_button = UIButton('green_btn.png', shop_screen_sprites, text='DONAT',
+                            font=pygame.font.SysFont('SPACE MISSION', 50))
+    donat_button.rect.centerx = 640 - 100
+    donat_button.rect.bottom = 360 - 5
+
+    while True:
+        event_list = pygame.event.get()
+        for event in event_list:
+            if event.type == pygame.QUIT:
+                exiting_the_game()
+            if event.type == pygame.KEYDOWN:
+                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
+                    return start_screen(889, 500)
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:
+                    pos = pygame.mouse.get_pos()
+                    if donat_button.is_clicked(*pos):
+                        return donat()
+
+        screen.fill((0, 0, 0))
+        screen.blit(background_image, background_rect)
+        shop_screen(screen, event_list)
+        shop_screen_sprites.update()
+        shop_screen_sprites.draw(screen)
+
+        clock.tick(GameSettings.fps)
+        pygame.display.flip()
+
+
+"Экран доната"
+def donat_screen(screen):
+
+    def draw_text(string, size, p):
+        font = pygame.font.SysFont('SPACE MISSION', size)
+        text = font.render(string, True, 'green')
+        screen.blit(text, p)
+
+    draw_text('Положи мамину карту', 70, (65, 40))
+    draw_text('на место', 70, (220, 100))
+    draw_text('И больше так не делай!', 70, (50, 300))
+
+
+"Функция доната"
+def donat():
     screen = pygame.display.set_mode((640, 360))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
@@ -304,15 +362,18 @@ def shop():
             if event.type == pygame.QUIT:
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
-                if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                    return start_screen(889, 500)
+                if event.key == pygame.K_BACKSPACE:
+                    return shop()
+
         screen.fill((0, 0, 0))
         screen.blit(background_image, background_rect)
-        shop_screen(screen, event_list)
+        donat_screen(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
 
+"Стартовый экран: запуск музыкальных эффектов, кнопки в другие функции, запись в базу данных, установка" \
+"на фон GIF, отрисовка разного рода информации"
 def start_screen(width, height):
     gc, gs = GameController, GameSettings
 
@@ -415,6 +476,8 @@ def start_screen(width, height):
         pygame.display.flip()
 
 
+"Экран смерти: обновление базы данных, музыкальный эффект, установка" \
+"на фон GIF, отрисовка разного рода информации, кнопка на стартовый кран"
 def game_over(width, height):
     gc, gs = GameController, GameSettings
 
@@ -468,6 +531,7 @@ def game_over(width, height):
         pygame.display.flip()
 
 
+"Экран результатов: отрисовка таблицы результатов"
 def leader_board(screen, width):
     pygame.font.init()
     i = 35
@@ -516,6 +580,7 @@ def leader_board(screen, width):
         screen.blit(line3_text, [width / 3 + 35, (700 / 11) + i * 5 + 20])
 
 
+"Функция запускает экран результатов"
 def result_screen():
     size = width, height = 565, 870
     screen = pygame.display.set_mode(size)
@@ -537,6 +602,7 @@ def result_screen():
         pygame.display.flip()
 
 
+"Начальный класс для движения обычных пришельцев, определение разных скоростей"
 class Alien(SWSprite):
     health = 1
     image_variants = 'alien2.png', 'alien3.png'
@@ -568,18 +634,21 @@ class Alien(SWSprite):
             GameController.spawn_alien()
 
 
+"Класс, для обычных прищельцов, двигающихся по y"
 class RammingAlien(Alien):
     def __init__(self, *groups):
         super().__init__(*groups)
         self.direction[1] = 1
 
 
+"Класс, для обычных прищельцов, двигающихся по x и y"
 class MobileAlien(Alien):
     def __init__(self, *groups, image_name=None):
         super().__init__(*groups, image_name=image_name)
         self.direction = [random.uniform(-1, 1), 1]
 
 
+"Класс, для прищельцов, которые останавливаются и стреляют в игрока"
 class SoldierAlien(MobileAlien):
     def __init__(self, bullet_group, *groups, image_name=None):
         super().__init__(*groups, image_name=image_name)
@@ -606,6 +675,7 @@ class SoldierAlien(MobileAlien):
             self.shoot_cooldown = 60
 
 
+"Класс, для прищельцов, которые двигаются по x за игроком и стреляют в него"
 class EliteSoldierAlien(SoldierAlien):
     def __init__(self, bullet_group, *groups, player_to_track, image_name=None):
         super().__init__(bullet_group, *groups, image_name=image_name)
@@ -626,6 +696,7 @@ class EliteSoldierAlien(SoldierAlien):
                     self.follow_player()
                 self.shoot_cooldown -= 1 * self.attack_speed
 
+    "Движение за игроком"
     def follow_player(self):
         alien_x = self.rect.centerx
         player_x = self.player_to_track.rect.centerx
@@ -638,6 +709,7 @@ class EliteSoldierAlien(SoldierAlien):
         super().update()
 
 
+"Класс, для босса, стреляющего в игрока"
 class BossAlien(EliteSoldierAlien):
     health = 45
 
@@ -669,6 +741,7 @@ class BossAlien(EliteSoldierAlien):
                 case 2: self.second_stage()
                 case 3: self.third_stage()
 
+    "Первая атака босса: движение за игроком и стрельба в него"
     def first_stage(self):
         if self.shoot_cooldown <= 0:
             if self.attack_counter == 0:
@@ -682,6 +755,7 @@ class BossAlien(EliteSoldierAlien):
                 self.follow_player()
             self.shoot_cooldown -= 1 * self.attack_speed
 
+    "Вторая атака босса: остановка босса по центру и направление атаки тарана"
     def second_stage(self):
         if abs(self.rect.centerx - (center_x := GameSettings.screen_width // 2)) > 10:
             self.direction[0] = 0.5 if self.rect.centerx < center_x else -0.5
@@ -691,6 +765,8 @@ class BossAlien(EliteSoldierAlien):
         else:
             self.spawn_ram_cooldown -= 1 * self.attack_speed
 
+    "Третья атака босса: следование за игроком и стрельба в него, направление атаки тарана и спавн стреляющих" \
+    "пришельцов"
     def third_stage(self):
         self.first_stage()
 
@@ -704,6 +780,7 @@ class BossAlien(EliteSoldierAlien):
         else:
             self.spawn_soldier_cooldown -= 1 * self.attack_speed
 
+    "Стрельба босса"
     def shoot(self):
         if self.shoot_cooldown <= 0:
             Bullet(self, self.rect.centerx - 50, self.rect.bottom, GameController.all_sprites,
@@ -716,6 +793,7 @@ class BossAlien(EliteSoldierAlien):
             else:
                 self.shoot_cooldown = 60
 
+    "Спавн тарана"
     def spawn_ram(self):
         gc = GameController
         if self.spawn_ram_cooldown <= 0:
@@ -730,6 +808,7 @@ class BossAlien(EliteSoldierAlien):
                 r.set_pos(player_x + 50 * i, -100 + random.uniform(-30, 30))
             self.spawn_ram_cooldown = 120
 
+    "Спавн стреляющих пришельцов"
     def spawn_soldier(self):
         gc = GameController
         if self.spawn_soldier_cooldown <= 0:
@@ -739,6 +818,7 @@ class BossAlien(EliteSoldierAlien):
             self.spawn_soldier_cooldown = 240
 
 
+"Спавн монет"
 class Coin(Alien):
     def __init__(self, *groups):
         super().__init__(*groups, image_name='coin.png')
@@ -746,6 +826,7 @@ class Coin(Alien):
         self.direction[1] = 1
 
 
+"Класс, отвечающий за стрельбу каждого, смена вида стрелы"
 class Bullet(SWSprite):
     image_names = "bullet_player.png", "bullet_alien.png", "bullet_boss.png"
 
@@ -767,12 +848,13 @@ class Bullet(SWSprite):
             self.target = Player
             self.image = pygame.transform.flip(self.image, False, True)
         else:
-            raise ValueError(f'Владелец должен относиться к классу Player или классу Alien')
+            raise ValueError(f'Владелец должен относиться к классу Player или классу Alien или классу BossAlien')
         self.rect.centerx = x
         self.rect.bottom = y
         self.damage = damage
         self.speed = speed
 
+    "Движение стрелы"
     def update(self):
         self.move(0, self.speed if self.target == Player else -self.speed)
         if self.rect.bottom <= 0 or self.rect.top >= GameSettings.screen_height or \
@@ -780,6 +862,7 @@ class Bullet(SWSprite):
             self.kill()
 
 
+"Класс, отвечающий за движение игрока и его стрельбу"
 class Player(SWSprite):
     health = 100
     image_names = "spaceX.png", "spaceX2.png", "spaceX3.png", "spaceX4.png"
@@ -804,6 +887,7 @@ class Player(SWSprite):
         self.attack_speed = attack_speed
         self.shoot_cooldown = 0
 
+    "Движение игрока"
     def update(self):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1 * self.attack_speed
@@ -831,6 +915,7 @@ class Player(SWSprite):
                 direction[1] = 0
             self.move(*(d * speed for d in direction))
 
+    "Стрельба игрока, взависимости от типа коробля"
     def shoot(self):
         if self.shoot_cooldown <= 0:
             if GameController.player_plain == 'spaceX.png':
@@ -857,6 +942,7 @@ class Player(SWSprite):
             self.shoot_cooldown = 60
 
 
+"Основная функция, которая отвечает за фоновую музыку, паузу, отрисовку разного рода информации"
 def main():
     gc = GameController
     gs = GameSettings
@@ -927,6 +1013,7 @@ def main():
         pygame.display.flip()
 
 
+"Запуск, подгрузка музыки"
 if __name__ == '__main__':
     pygame.init()
 

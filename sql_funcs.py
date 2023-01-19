@@ -1,3 +1,4 @@
+"Функция, для появления новой записи в базах данных"
 def sql_insert(con, entities):
     cur = con.cursor()
     cur.execute(
@@ -6,6 +7,7 @@ def sql_insert(con, entities):
     con.commit()
 
 
+"Функция, для обновления количества очков"
 def sql_update_score(con, entities):
     cur = con.cursor()
     cur.execute("""UPDATE score
@@ -15,6 +17,7 @@ def sql_update_score(con, entities):
     con.commit()
 
 
+"Функция, для обновления количества монет"
 def sql_update_coin(con, entities):
     cur = con.cursor()
     cur.execute("""UPDATE score
