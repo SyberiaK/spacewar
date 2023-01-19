@@ -1,3 +1,4 @@
+import math
 import os
 import random
 from tkinter import Tk, messagebox
@@ -56,7 +57,7 @@ class GameController:
                 MobileAlien(cls.aliens, cls.all_sprites)
             else:
                 RammingAlien(cls.aliens, cls.all_sprites)
-        if cls.current_coin is None and cls.score % 100 == 0:
+        if cls.current_coin in [None, 'deleted'] and cls.score % 100 == 0:
             cls.current_coin = Coin(cls.coin, cls.all_sprites)
 
     @classmethod
@@ -64,6 +65,7 @@ class GameController:
         if isinstance(alien, BossAlien):
             cls.current_boss = None
             cls.score += 100
+            cls.coins += 5
 
             cls.score_rates['mobile'] += 600
             cls.score_rates['soldier'] += 600
@@ -107,6 +109,10 @@ class GameController:
             cls.coins += 1
             cls.current_coin = None
 
+        if isinstance(cls.current_coin, Coin) and cls.current_coin.pos[1] > gs.screen_height:
+            cls.current_coin.kill()
+            cls.current_coin = 'deleted'
+
         if cls.player.health <= 0:
             SoundManager.stop_sound('background_music')
             cls.player.kill()
@@ -123,7 +129,7 @@ class GameController:
 
     @classmethod
     def gc_defaults(cls):
-        cls.score = 0
+        cls.score = 1000
         cls.coins = 0
         cls.timer = 0
 
@@ -149,9 +155,13 @@ def exiting_the_game():
 
 
 def input_nick():
+    nick_entered = False
+
     def on_nick_enter(textbox):
+        nonlocal nick_entered
+
         GameController.nickname = textbox.text
-        main()
+        nick_entered = True
 
     screen = pygame.display.set_mode((650, 200))
     pygame.display.set_caption("Space War")
@@ -164,6 +174,8 @@ def input_nick():
         for event in event_list:
             if event.type == pygame.QUIT:
                 exiting_the_game()
+        if nick_entered:
+            return
         box.update(event_list)
         screen.fill((0, 0, 0))
         screen.blit(background_image, background_rect)
@@ -178,29 +190,29 @@ def shop_screen(screen, event_list):
     cur = con.cursor()
     result_score = cur.execute("""SELECT Coin FROM score
                                       WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
-    result_spaceX2 = cur.execute("""SELECT spaceX2 FROM score
+    result_space_x2 = cur.execute("""SELECT spaceX2 FROM score
                                         WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
-    spaceX2 = result_spaceX2[0][0]
-    result_spaceX3 = cur.execute("""SELECT spaceX3 FROM score
+    space_x2 = result_space_x2[0][0]
+    result_space_x3 = cur.execute("""SELECT spaceX3 FROM score
                                         WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
-    spaceX3 = result_spaceX3[0][0]
-    result_spaceX4 = cur.execute("""SELECT spaceX4 FROM score
+    space_x3 = result_space_x3[0][0]
+    result_space_x4 = cur.execute("""SELECT spaceX4 FROM score
                                         WHERE Nickname = ?""", (GameController.nickname,)).fetchall()
-    spaceX4 = result_spaceX4[0][0]
+    space_x4 = result_space_x4[0][0]
 
     coin = result_score[0][0]
 
-    def draw_text(string, size, p):
+    def _draw_text(string, size, p):
         font = pygame.font.SysFont('SPACE MISSION', size)
         text = font.render(string, True, 'yellow')
         screen.blit(text, p)
 
-    def shop_spaceX():
+    def shop_space_x():
         GameController.player_plain = 'spaceX.png'
         GameController.pos = [40, 180]
 
-    def shop_spaceX2():
-        if spaceX2 == 0:
+    def shop_space_x2():
+        if space_x2 == 0:
             if coin - d.get('spaceX2') >= 0:
                 cur.execute("""UPDATE score
                                SET spaceX2 = 1
@@ -213,9 +225,8 @@ def shop_screen(screen, event_list):
             GameController.player_plain = 'spaceX2.png'
             GameController.pos = [195, 180]
 
-
-    def shop_spaceX3():
-        if spaceX3 == 0:
+    def shop_space_x3():
+        if space_x3 == 0:
             if coin - d.get('spaceX3') >= 0:
                 cur.execute("""UPDATE score
                                SET spaceX3 = 1
@@ -228,8 +239,8 @@ def shop_screen(screen, event_list):
             GameController.player_plain = 'spaceX3.png'
             GameController.pos = [360, 180]
 
-    def shop_spaceX4():
-        if spaceX4 == 0:
+    def shop_space_x4():
+        if space_x4 == 0:
             if coin - d.get('spaceX4') >= 0:
                 cur.execute("""UPDATE score
                                SET spaceX4 = 1
@@ -242,54 +253,58 @@ def shop_screen(screen, event_list):
             GameController.player_plain = 'spaceX4.png'
             GameController.pos = [530, 180]
 
-    coin_draw = SWSprite('coin_draw.png')
-    coin_draw_count = SWSprite('coin.png')
-    ok = SWSprite('ok.png')
-    spaceX = FileManager.load_image('spaceX.png')
-    spaceX_rect = spaceX.get_rect()
-    spaceX_rect.x, spaceX_rect.y = 10, 50
-    spaceX2_im = FileManager.load_image('spaceX2_shop.png')
-    spaceX2_rect = spaceX2_im.get_rect()
-    spaceX2_rect.x, spaceX2_rect.y = 125, 5
-    spaceX3_im = FileManager.load_image('spaceX3_shop.png')
-    spaceX3_rect = spaceX3_im.get_rect()
-    spaceX3_rect.x, spaceX3_rect.y = 295, 5
-    spaceX4_im = FileManager.load_image('spaceX4_shop.png')
-    spaceX4_rect = spaceX4_im.get_rect()
-    spaceX4_rect.x, spaceX4_rect.y = 468, 5
-    screen.blit(spaceX, [10, 50])
-    screen.blit(spaceX2_im, [125, 5])
-    screen.blit(spaceX3_im, [295, 5])
-    screen.blit(spaceX4_im, [468, 5])
+    ui_margin = 5
+
+    shop_ui = pygame.sprite.Group()
+
+    coin_draw_count = SWSprite('coin.png', shop_ui)
     coin_draw_count.set_pos(10, 305)
-    coin_draw_count.draw(screen)
-    draw_text(': ', 50, (58, 310))
-    draw_text(str(coin), 45, (78, 315))
+
+    ok = SWSprite('ok.png', shop_ui)
     ok.set_pos(*GameController.pos)
-    ok.draw(screen)
-    if spaceX2 == 0:
-        coin_draw.set_pos(170, 180)
-        coin_draw.draw(screen)
-        draw_text(': 25', 40, (210, 185))
-    if spaceX3 == 0:
-        coin_draw.set_pos(330, 180)
-        coin_draw.draw(screen)
-        draw_text(': 50', 40, (370, 185))
-    if spaceX4 == 0:
-        coin_draw.set_pos(487, 180)
-        coin_draw.draw(screen)
-        draw_text(': 100', 40, (527, 185))
+
+    space_x_spr = SWSprite('spaceX.png', shop_ui)
+    space_x_spr.set_pos(10, 50)
+    space_x2_spr = SWSprite('spaceX2_shop.png', shop_ui)
+    space_x2_spr.set_pos(125, 5)
+    space_x3_spr = SWSprite('spaceX3_shop.png', shop_ui)
+    space_x3_spr.set_pos(295, 5)
+    space_x4_spr = SWSprite('spaceX4_shop.png', shop_ui)
+    space_x4_spr.set_pos(468, 5)
+
+    return_button = UIButton('red_btn.png', shop_ui, text='RETURN',
+                             font=pygame.font.SysFont('SPACE MISSION', 50))
+    return_button.set_pos(screen.get_width() - return_button.size[0] - ui_margin,
+                          screen.get_height() - return_button.size[1] - ui_margin)
+
+    if space_x2 == 0:
+        SWSprite('coin_draw.png', shop_ui).set_pos(170, 180)
+        _draw_text(': 25', 40, (210, 185))
+    if space_x3 == 0:
+        SWSprite('coin_draw.png', shop_ui).set_pos(330, 180)
+        _draw_text(': 50', 40, (370, 185))
+    if space_x4 == 0:
+        SWSprite('coin_draw.png', shop_ui).set_pos(487, 180)
+        _draw_text(': 100', 40, (527, 185))
+
+    _draw_text(': ', 50, (58, 310))
+    _draw_text(str(coin), 45, (78, 315))
+    shop_ui.draw(screen)
+    shop_ui.update()
+
     for event in event_list:
-        x, y = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if spaceX_rect.collidepoint(x, y):
-                shop_spaceX()
-            elif spaceX2_rect.collidepoint(x, y):
-                shop_spaceX2()
-            elif spaceX3_rect.collidepoint(x, y):
-                shop_spaceX3()
-            elif spaceX4_rect.collidepoint(x, y):
-                shop_spaceX4()
+            pos = pygame.mouse.get_pos()
+            if space_x_spr.rect.collidepoint(*pos):
+                shop_space_x()
+            elif space_x2_spr.rect.collidepoint(*pos):
+                shop_space_x2()
+            elif space_x3_spr.rect.collidepoint(*pos):
+                shop_space_x3()
+            elif space_x4_spr.rect.collidepoint(*pos):
+                shop_space_x4()
+            if return_button.is_clicked(*pos):
+                return
 
 
 def shop():
@@ -305,7 +320,7 @@ def shop():
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                    return start_screen(889, 500)
+                    return
         screen.fill((0, 0, 0))
         screen.blit(background_image, background_rect)
         shop_screen(screen, event_list)
@@ -319,7 +334,41 @@ def start_screen(width, height):
     def to_game():
         SoundManager.stop_sound('main_menu_theme')
         SoundManager.play_sound('start_game', volume=gs.music_volume)
-        pygame.time.wait(5000)
+
+        timer_font = pygame.font.SysFont('SPACE MISSION', 100)
+
+        start_button.kill()
+        shop_button.kill()
+        resultat_button.kill()
+        icon.kill()
+
+        start_ticks = pygame.time.get_ticks()
+        while True:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    exiting_the_game()
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_ESCAPE:
+                        exiting_the_game()
+            start_timer = math.ceil(5 - ((pygame.time.get_ticks() - start_ticks) / 1000))
+            if start_timer <= 0:
+                break
+
+            start_screen_sprites.update()
+            start_screen_sprites.draw(screen)
+
+            timer_rendered = timer_font.render(str(start_timer), True, pygame.Color('DodgerBlue'))
+            timer_rendered_outline = timer_font.render(str(start_timer), True, pygame.Color('white'))
+            _string_width, _string_height = timer_rendered.get_size()
+            timer_pos = width // 2 - _string_width // 2, height // 2 - _string_height // 2
+            for x in range(-2, 3, 4):
+                for y in range(-2, 3, 4):
+                    _pos = timer_pos[0] + x, timer_pos[1] + y
+                    screen.blit(timer_rendered_outline, _pos)
+            screen.blit(timer_rendered, timer_pos)
+
+            clock.tick(gs.fps)
+            pygame.display.flip()
 
     def draw_coin_on_start_screen():
         con = FileManager.load_base('result.db')
@@ -358,7 +407,7 @@ def start_screen(width, height):
     start_button.rect.bottom = height - ui_margin
 
     shop_button = UIButton('yellow_btn.png', start_screen_sprites, text='SHOP',
-                            font=pygame.font.SysFont('SPACE MISSION', 50))
+                           font=pygame.font.SysFont('SPACE MISSION', 50))
     shop_button.rect.centerx = width - 100
     shop_button.rect.bottom = height - ui_margin
 
@@ -383,21 +432,23 @@ def start_screen(width, height):
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
                 if event.key == pygame.K_r:
-                    return result_screen()
+                    result_screen()
                 if event.key == pygame.K_m:
-                    return shop()
+                    shop()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     pos = pygame.mouse.get_pos()
                     if start_button.is_clicked(*pos):
                         return to_game()
                     if shop_button.is_clicked(*pos):
-                        return shop()
+                        shop()
+                        screen = pygame.display.set_mode((width, height))
                     if resultat_button.is_clicked(*pos):
-                        return result_screen()
+                        result_screen()
+                        screen = pygame.display.set_mode((width, height))
                     if icon.is_clicked(*pos):
-                        SoundManager.stop_sound('main_menu_theme')
-                        return input_nick()
+                        input_nick()
+                        screen = pygame.display.set_mode((width, height))
 
         start_screen_sprites.update()
         start_screen_sprites.draw(screen)
@@ -427,7 +478,7 @@ def game_over(width, height):
     SoundManager.play_sound('game_over', volume=gs.music_volume)
 
     end_button = UIButton('red_btn.png', end_screen_sprites, text='RETURN',
-                            font=pygame.font.SysFont('SPACE MISSION', 50))
+                          font=pygame.font.SysFont('SPACE MISSION', 50))
     end_button.rect.centerx = width // 2
     end_button.rect.bottom = height - 10
 
@@ -453,14 +504,14 @@ def game_over(width, height):
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_RETURN:
-                    main()
+                    return start_screen(889, 500)
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
             if event.type == pygame.MOUSEBUTTONDOWN:
                 if event.button == 1:
                     x, y = pygame.mouse.get_pos()
                     if end_button.is_clicked(x, y):
-                        return main()
+                        return start_screen(889, 500)
 
         end_screen_sprites.update()
         end_screen_sprites.draw(screen)
@@ -530,7 +581,7 @@ def result_screen():
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
-                    return start_screen(889, 500)
+                    return
         screen.blit(background, background_rect)
         leader_board(screen, width)
         clock.tick(GameSettings.fps)
@@ -562,7 +613,7 @@ class Alien(SWSprite):
 
     def update(self):
         self.move(*(d * self.speed for d in self.direction))
-        if self.rect.top >= GameSettings.screen_height or\
+        if self.rect.top >= GameSettings.screen_height or \
                 self.rect.right <= 0 or self.rect.left >= GameSettings.screen_width:
             self.kill()
             GameController.spawn_alien()
@@ -592,6 +643,12 @@ class SoldierAlien(MobileAlien):
         self.shoot_cooldown = random.randint(0, 60)
 
     def update(self):
+        if self.rect.left < 0:
+            self.direction[0] = 1
+        elif self.rect.right > GameSettings.screen_width:
+            self.direction[0] = -1
+        elif type(self) is SoldierAlien:
+            self.direction[0] = 0
         if self.rect.centery < self.stop_at or type(self) is not SoldierAlien:
             super().update()
         elif self.shoot_cooldown <= 0:
@@ -858,6 +915,8 @@ class Player(SWSprite):
 
 
 def main():
+    start_screen(889, 500)
+
     gc = GameController
     gs = GameSettings
 
@@ -865,7 +924,6 @@ def main():
 
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    start_screen(889, 500)
     screen = pygame.display.set_mode(gs.screen_size)
     pause = False
 
@@ -929,6 +987,7 @@ def main():
 
 if __name__ == '__main__':
     pygame.init()
+    pygame.display.set_caption("Space War")
 
     SoundManager.load_sound('main_menu_theme', 'start.mp3')
     SoundManager.load_sound('start_game', 'start_engine.mp3')
@@ -940,3 +999,4 @@ if __name__ == '__main__':
     SoundManager.load_sound('game_over', 'game-over.mp3')
 
     input_nick()
+    main()
