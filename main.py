@@ -10,7 +10,7 @@ from managers import FileManager, SoundManager
 from settings import GameSettings
 from sql_funcs import sql_insert, sql_update_score, sql_update_coin
 from sprites import AnimatedSprite, SWSprite
-from ui import TextInputBox, UIButton
+from ui import Canvas, TextInputBox, UIButton
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 
@@ -174,20 +174,19 @@ def input_nick():
     screen = pygame.display.set_mode((650, 200))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    box = TextInputBox(GameController.textbox, on_enter=on_nick_enter)
-    background_image = FileManager.load_image('screen_fon.png')
-    background_rect = background_image.get_rect()
+    box = TextInputBox(on_enter=on_nick_enter)
+    background_image = SWSprite('screen_fon.png')
     while True:
-        event_list = pygame.event.get()
-        for event in event_list:
+        events = pygame.event.get()
+        for event in events:
             if event.type == pygame.QUIT:
                 exiting_the_game()
+            box.update(event)
         if nick_entered:
             return
-        box.update(event_list)
-        screen.fill((0, 0, 0))
-        screen.blit(background_image, background_rect)
-        GameController.textbox.draw(screen)
+
+        background_image.draw(screen)
+        box.draw(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
 
@@ -272,13 +271,15 @@ def shop_screen(screen, event_list):
     ok = SWSprite('ok.png', shop_ui)
     ok.set_pos(*GameController.pos)
 
-    space_x_spr = SWSprite('spaceX.png', shop_ui)
+    empty_font = pygame.font.SysFont('SPACE MISSION', 0)
+
+    space_x_spr = UIButton('spaceX.png', shop_ui, text='', font=empty_font, binding=shop_space_x)
     space_x_spr.set_pos(10, 50)
-    space_x2_spr = SWSprite('spaceX2_shop.png', shop_ui)
+    space_x2_spr = UIButton('spaceX2_shop.png', shop_ui, text='', font=empty_font, binding=shop_space_x2)
     space_x2_spr.set_pos(125, 5)
-    space_x3_spr = SWSprite('spaceX3_shop.png', shop_ui)
+    space_x3_spr = UIButton('spaceX3_shop.png', shop_ui, text='', font=empty_font, binding=shop_space_x3)
     space_x3_spr.set_pos(295, 5)
-    space_x4_spr = SWSprite('spaceX4_shop.png', shop_ui)
+    space_x4_spr = UIButton('spaceX4_shop.png', shop_ui, text='', font=empty_font, binding=shop_space_x4)
     space_x4_spr.set_pos(468, 5)
 
     if space_x2 == 0:
@@ -294,20 +295,9 @@ def shop_screen(screen, event_list):
     _draw_text(': ', 50, (58, 310))
     _draw_text(str(coin), 45, (78, 315))
     shop_ui.draw(screen)
-    shop_ui.update()
 
     for event in event_list:
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 1:
-                pos = pygame.mouse.get_pos()
-                if space_x_spr.rect.collidepoint(*pos):
-                    shop_space_x()
-                elif space_x2_spr.rect.collidepoint(*pos):
-                    shop_space_x2()
-                elif space_x3_spr.rect.collidepoint(*pos):
-                    shop_space_x3()
-                elif space_x4_spr.rect.collidepoint(*pos):
-                    shop_space_x4()
+        shop_ui.update(event)
 
 
 "Запуск функции магазина, установка фона и кнопки"
@@ -317,14 +307,16 @@ def shop():
     screen = pygame.display.set_mode((640, 360))
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
-    shop_screen_sprites = pygame.sprite.Group()
-    background_image = FileManager.load_image('fon_shop.png')
-    background_rect = background_image.get_rect()
 
-    donat_button = UIButton('green_btn.png', shop_screen_sprites, text='DONATE',
-                            font=pygame.font.SysFont('SPACE MISSION', 50))
+    background = SWSprite('fon_shop.png')
+    canvas = Canvas(screen)
+
+    donat_button = UIButton('green_btn.png', text='DONATE',
+                            font=pygame.font.SysFont('SPACE MISSION', 50), binding=donat)
     donat_button.rect.centerx = 640 - 100
     donat_button.rect.bottom = 360 - ui_margin
+
+    canvas.add(donat_button)
 
     while True:
         event_list = pygame.event.get()
@@ -334,17 +326,11 @@ def shop():
             if event.type == pygame.KEYDOWN:
                 if event.key in (pygame.K_ESCAPE, pygame.K_BACKSPACE):
                     return
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    pos = pygame.mouse.get_pos()
-                    if donat_button.is_clicked(*pos):
-                        return donat()
+            canvas.update(event)
 
-        screen.fill((0, 0, 0))
-        screen.blit(background_image, background_rect)
+        background.draw(screen)
         shop_screen(screen, event_list)
-        shop_screen_sprites.update()
-        shop_screen_sprites.draw(screen)
+        canvas.draw()
 
         clock.tick(GameSettings.fps)
         pygame.display.flip()
@@ -399,7 +385,7 @@ def start_screen(width, height):
 
         start_button.kill()
         shop_button.kill()
-        resultat_button.kill()
+        result_button.kill()
         icon.kill()
 
         start_ticks = pygame.time.get_ticks()
@@ -456,34 +442,38 @@ def start_screen(width, height):
     clock = pygame.time.Clock()
 
     ui_margin = 5
+    canvas = Canvas(screen)
 
     title_font = pygame.font.SysFont('SPACE MISSION', 65)
     profile = pygame.font.SysFont('SPACE MISSION', 50)
     ba_frames = FileManager.load_gif_frames('start.gif')
-    AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10, update_rate=gs.fps)
+    background = AnimatedSprite(ba_frames, start_screen_sprites, frame_rate=10, update_rate=gs.fps)
 
-    start_button = UIButton('red_btn.png', start_screen_sprites, text='START',
-                            font=profile)
+    start_button = UIButton('red_btn.png', text='START',
+                            font=profile, binding=to_game)
     start_button.rect.centerx = width // 2
     start_button.rect.bottom = height - ui_margin
 
-    shop_button = UIButton('yellow_btn.png', start_screen_sprites, text='SHOP',
-                           font=pygame.font.SysFont('SPACE MISSION', 50))
+    shop_button = UIButton('yellow_btn.png', text='SHOP',
+                           font=pygame.font.SysFont('SPACE MISSION', 50), binding=shop)
     shop_button.rect.centerx = width - 100
     shop_button.rect.bottom = height - ui_margin
 
-    resultat_button = UIButton('green_btn.png', start_screen_sprites, text='SCORE',
-                               font=pygame.font.SysFont('SPACE MISSION', 50))
-    resultat_button.rect.centerx = 100
-    resultat_button.rect.bottom = height - ui_margin
+    result_button = UIButton('green_btn.png', text='SCORE',
+                               font=pygame.font.SysFont('SPACE MISSION', 50), binding=result_screen)
+    result_button.rect.centerx = 100
+    result_button.rect.bottom = height - ui_margin
 
-    icon = UIButton('ikonka.png', start_screen_sprites, text='', font=profile)
+    icon = UIButton('ikonka.png', text='', font=profile, binding=input_nick)
     icon.set_pos(ui_margin, ui_margin + 1)
+
+    canvas.add(start_button, shop_button, result_button, icon)
 
     if 'main_menu_theme' not in SoundManager.playing_loops:
         SoundManager.play_sound('main_menu_theme', volume=gs.music_volume, loop=True)
 
     while True:
+        screen = pygame.display.set_mode((width, height))
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exiting_the_game()
@@ -496,23 +486,11 @@ def start_screen(width, height):
                     result_screen()
                 if event.key == pygame.K_m:
                     shop()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    pos = pygame.mouse.get_pos()
-                    if start_button.is_clicked(*pos):
-                        to_game()
-                    if shop_button.is_clicked(*pos):
-                        shop()
-                        screen = pygame.display.set_mode((width, height))
-                    if resultat_button.is_clicked(*pos):
-                        result_screen()
-                        screen = pygame.display.set_mode((width, height))
-                    if icon.is_clicked(*pos):
-                        input_nick()
-                        screen = pygame.display.set_mode((width, height))
+            canvas.update(event)
 
-        start_screen_sprites.update()
-        start_screen_sprites.draw(screen)
+        background.update()
+        background.draw(screen)
+        canvas.draw()
 
         for line in space_war:
             string_rendered = title_font.render(line, True, pygame.Color('DodgerBlue'))
@@ -530,6 +508,11 @@ def start_screen(width, height):
 "Экран смерти: обновление базы данных, музыкальный эффект, установка" \
 "на фон GIF, отрисовка разного рода информации, кнопка на стартовый кран"
 def game_over(width, height):
+    def break_loop():
+        nonlocal loop
+
+        loop = False
+
     gc, gs = GameController, GameSettings
 
     screen = pygame.display.set_mode((width, height))
@@ -541,7 +524,7 @@ def game_over(width, height):
     SoundManager.play_sound('game_over', volume=gs.music_volume)
 
     end_button = UIButton('red_btn.png', end_screen_sprites, text='RETURN',
-                          font=pygame.font.SysFont('SPACE MISSION', 50))
+                          font=pygame.font.SysFont('SPACE MISSION', 50), binding=break_loop)
     end_button.rect.centerx = width // 2
     end_button.rect.bottom = height - 10
 
@@ -561,7 +544,8 @@ def game_over(width, height):
     entities = (gc.coins + old_coin, gc.nickname)
     sql_update_coin(con, entities)
 
-    while True:
+    loop = True
+    while loop:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exiting_the_game()
@@ -570,16 +554,13 @@ def game_over(width, height):
                     return start_screen(889, 500)
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:
-                    x, y = pygame.mouse.get_pos()
-                    if end_button.is_clicked(x, y):
-                        return start_screen(889, 500)
 
         end_screen_sprites.update()
         end_screen_sprites.draw(screen)
         clock.tick(GameSettings.fps)
         pygame.display.flip()
+
+    return start_screen(889, 500)
 
 
 "Экран результатов: отрисовка таблицы результатов"
@@ -1001,11 +982,20 @@ class Player(SWSprite):
 
 "Основная функция, которая отвечает за фоновую музыку, паузу, отрисовку разного рода информации"
 def main():
+    def pause_switch():
+        nonlocal pause
+
+        pause = not pause
+        if pause:
+            play_pause_button.change_image(play_button)
+            play_pause_button.text = 'PLAY'
+        else:
+            play_pause_button.change_image(pause_button)
+            play_pause_button.text = 'PAUSE'
+
 
     gc = GameController
     gs = GameSettings
-
-    game_ui_sprites = pygame.sprite.Group()
 
     pygame.display.set_caption("Space War")
     clock = pygame.time.Clock()
@@ -1020,38 +1010,31 @@ def main():
 
     pause_button = FileManager.load_image('yellow_btn.png')
     play_button = FileManager.load_image('green_btn.png', 'white')
-    play_pause_button = UIButton(pause_button, game_ui_sprites, text='PAUSE',
-                                 font=pygame.font.SysFont('SPACE MISSION', 40))
+    play_pause_button = UIButton(pause_button, text='PAUSE',
+                                 font=pygame.font.SysFont('SPACE MISSION', 40), binding=pause_switch)
     play_pause_button.set_pos(10, 75)
+
+    canvas = Canvas(screen, play_pause_button)
 
     SoundManager.play_sound('background_music', volume=gs.music_volume, loop=True)
 
     while True:
-        x, y = pygame.mouse.get_pos()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 exiting_the_game()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
                     exiting_the_game()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                if pygame.mouse.get_pressed()[0]:
-                    if play_pause_button.is_clicked(x, y):
-                        pause = not pause
+            canvas.update(event)
+
         if not pause:
             for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    exiting_the_game()
                 if event.type == pygame.KEYDOWN:
                     gc.player.update()
             if pygame.key.get_pressed()[pygame.K_SPACE]:
                 gc.player.shoot()
 
             gc.update()
-
-            play_pause_button.change_image(pause_button)
-            play_pause_button.text = 'PAUSE'
-
             screen.fill('black')
 
             gc.all_sprites.draw(screen)
@@ -1062,11 +1045,7 @@ def main():
             if gc.current_boss:
                 draw_health(screen, gc.current_boss, gs.screen_width // 2 - 200, 20, 400, 15)
             clock.tick(gs.fps)
-        else:
-            play_pause_button.change_image(play_button)
-            play_pause_button.text = 'PLAY'
-        game_ui_sprites.draw(screen)
-        game_ui_sprites.update()
+        canvas.draw()
         pygame.display.flip()
 
 
