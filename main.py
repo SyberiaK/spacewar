@@ -1,10 +1,9 @@
 import math
 import os
 import random
-from tkinter import Tk, messagebox
 
 import pygame
-import sys
+from pygame._sdl2 import messagebox
 
 from draw import draw_coin, draw_health, draw_text
 from managers import FileManager, SoundManager
@@ -143,16 +142,22 @@ class GameController:
 
 "Выход из игры"
 def terminate():
+    import sys
+
     pygame.quit()
     sys.exit()
 
 
 "Подтверждение о выходе"
 def exiting_the_game():
-    Tk().withdraw()
-    answer = messagebox.askyesno(title="Подтверждение о выходе", message="Вы хотите выйти из игры?")
+    answer = messagebox(title="Подтверждение о выходе",
+                        message="Вы хотите выйти из игры?",
+                        info=True,
+                        buttons=("Да", "Нет"),
+                        return_button=1,
+                        escape_button=1)
 
-    if answer:
+    if answer == 0:
         terminate()
 
 
