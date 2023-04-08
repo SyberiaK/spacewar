@@ -15,8 +15,9 @@ from ui import TextInputBox, UIButton
 
 os.environ['SDL_VIDEO_WINDOW_POS'] = '550, 35'
 
-
 "Класс, контролирующий игру: спавн пришельцов и монет, соприкосновения, отправка на экран смерти"
+
+
 class GameController:
     all_sprites = pygame.sprite.Group()
     aliens = pygame.sprite.Group()
@@ -142,12 +143,16 @@ class GameController:
 
 
 "Выход из игры"
+
+
 def terminate():
     pygame.quit()
     sys.exit()
 
 
 "Подтверждение о выходе"
+
+
 def exiting_the_game():
     Tk().withdraw()
     answer = messagebox.askyesno(title="Подтверждение о выходе", message="Вы хотите выйти из игры?")
@@ -157,6 +162,8 @@ def exiting_the_game():
 
 
 "Запуск класса ввода ника"
+
+
 def input_nick():
     nick_entered = False
 
@@ -189,6 +196,8 @@ def input_nick():
 
 "Экран магазина: отрисовка монет, покупка кораблей, проверка на количество монет, обновление базы данных," \
 "отрисовка выбора корабля"
+
+
 def shop_screen(screen, event_list):
     d = {'spaceX2': 25, 'spaceX3': 50, 'spaceX4': 100}
     con = FileManager.load_base('result.db')
@@ -258,7 +267,6 @@ def shop_screen(screen, event_list):
             GameController.player_plain = 'spaceX4.png'
             GameController.pos = [530, 180]
 
-
     shop_ui = pygame.sprite.Group()
 
     coin_draw_count = SWSprite('coin.png', shop_ui)
@@ -306,6 +314,8 @@ def shop_screen(screen, event_list):
 
 
 "Запуск функции магазина, установка фона и кнопки"
+
+
 def shop():
     ui_margin = 5
 
@@ -346,8 +356,9 @@ def shop():
 
 
 "Экран доната"
-def donat_screen(screen):
 
+
+def donat_screen(screen):
     def draw_text_d(string, size, p):
         font = pygame.font.SysFont('SPACE MISSION', size)
         text = font.render(string, True, 'green')
@@ -359,6 +370,8 @@ def donat_screen(screen):
 
 
 "Функция доната"
+
+
 def donat():
     screen = pygame.display.set_mode((640, 360))
     pygame.display.set_caption("Space War")
@@ -383,6 +396,8 @@ def donat():
 
 "Стартовый экран: запуск музыкальных эффектов, кнопки в другие функции, запись в базу данных, установка" \
 "на фон GIF, отрисовка разного рода информации"
+
+
 def start_screen(width, height):
     gc, gs = GameController, GameSettings
 
@@ -524,6 +539,8 @@ def start_screen(width, height):
 
 "Экран смерти: обновление базы данных, музыкальный эффект, установка" \
 "на фон GIF, отрисовка разного рода информации, кнопка на стартовый кран"
+
+
 def game_over(width, height):
     gc, gs = GameController, GameSettings
 
@@ -578,6 +595,8 @@ def game_over(width, height):
 
 
 "Экран результатов: отрисовка таблицы результатов"
+
+
 def leader_board(screen, width):
     pygame.font.init()
     i = 35
@@ -627,6 +646,8 @@ def leader_board(screen, width):
 
 
 "Функция запускает экран результатов"
+
+
 def result_screen():
     size = width, height = 565, 870
     screen = pygame.display.set_mode(size)
@@ -649,6 +670,8 @@ def result_screen():
 
 
 "Начальный класс для движения обычных пришельцев, определение разных скоростей"
+
+
 class Alien(SWSprite):
     health = 1
     image_variants = 'alien2.png', 'alien3.png'
@@ -681,6 +704,8 @@ class Alien(SWSprite):
 
 
 "Класс, для обычных прищельцов, двигающихся по y"
+
+
 class RammingAlien(Alien):
     def __init__(self, *groups):
         super().__init__(*groups)
@@ -688,6 +713,8 @@ class RammingAlien(Alien):
 
 
 "Класс, для обычных прищельцов, двигающихся по x и y"
+
+
 class MobileAlien(Alien):
     def __init__(self, *groups, image_name=None):
         super().__init__(*groups, image_name=image_name)
@@ -695,6 +722,8 @@ class MobileAlien(Alien):
 
 
 "Класс, для прищельцов, которые останавливаются и стреляют в игрока"
+
+
 class SoldierAlien(MobileAlien):
     def __init__(self, bullet_group, *groups, image_name=None):
         super().__init__(*groups, image_name=image_name)
@@ -728,6 +757,8 @@ class SoldierAlien(MobileAlien):
 
 
 "Класс, для прищельцов, которые двигаются по x за игроком и стреляют в него"
+
+
 class EliteSoldierAlien(SoldierAlien):
     def __init__(self, bullet_group, *groups, player_to_track, image_name=None):
         super().__init__(bullet_group, *groups, image_name=image_name)
@@ -749,6 +780,7 @@ class EliteSoldierAlien(SoldierAlien):
                 self.shoot_cooldown -= 1 * self.attack_speed
 
     "Движение за игроком"
+
     def follow_player(self):
         alien_x = self.rect.centerx
         player_x = self.player_to_track.rect.centerx
@@ -762,6 +794,8 @@ class EliteSoldierAlien(SoldierAlien):
 
 
 "Класс, для босса, стреляющего в игрока"
+
+
 class BossAlien(EliteSoldierAlien):
     health = 45
 
@@ -789,11 +823,15 @@ class BossAlien(EliteSoldierAlien):
         else:
             self.direction[1] = 0
             match self.current_stage:
-                case 1: self.first_stage()
-                case 2: self.second_stage()
-                case 3: self.third_stage()
+                case 1:
+                    self.first_stage()
+                case 2:
+                    self.second_stage()
+                case 3:
+                    self.third_stage()
 
     "Первая атака босса: движение за игроком и стрельба в него"
+
     def first_stage(self):
         if self.shoot_cooldown <= 0:
             if self.attack_counter == 0:
@@ -808,6 +846,7 @@ class BossAlien(EliteSoldierAlien):
             self.shoot_cooldown -= 1 * self.attack_speed
 
     "Вторая атака босса: остановка босса по центру и направление атаки тарана"
+
     def second_stage(self):
         if abs(self.rect.centerx - (center_x := GameSettings.screen_width // 2)) > 10:
             self.direction[0] = 0.5 if self.rect.centerx < center_x else -0.5
@@ -819,6 +858,7 @@ class BossAlien(EliteSoldierAlien):
 
     "Третья атака босса: следование за игроком и стрельба в него, направление атаки тарана и спавн стреляющих" \
     "пришельцов"
+
     def third_stage(self):
         self.first_stage()
 
@@ -833,6 +873,7 @@ class BossAlien(EliteSoldierAlien):
             self.spawn_soldier_cooldown -= 1 * self.attack_speed
 
     "Стрельба босса"
+
     def shoot(self):
         if self.shoot_cooldown <= 0:
             Bullet(self, self.rect.centerx - 50, self.rect.bottom, GameController.all_sprites,
@@ -846,6 +887,7 @@ class BossAlien(EliteSoldierAlien):
                 self.shoot_cooldown = 60
 
     "Спавн тарана"
+
     def spawn_ram(self):
         gc = GameController
         if self.spawn_ram_cooldown <= 0:
@@ -861,6 +903,7 @@ class BossAlien(EliteSoldierAlien):
             self.spawn_ram_cooldown = 120
 
     "Спавн стреляющих пришельцов"
+
     def spawn_soldier(self):
         gc = GameController
         if self.spawn_soldier_cooldown <= 0:
@@ -871,6 +914,8 @@ class BossAlien(EliteSoldierAlien):
 
 
 "Спавн монет"
+
+
 class Coin(Alien):
     def __init__(self, *groups):
         super().__init__(*groups, image_name='coin.png')
@@ -879,6 +924,8 @@ class Coin(Alien):
 
 
 "Класс, отвечающий за стрельбу каждого, смена вида стрелы"
+
+
 class Bullet(SWSprite):
     image_names = "bullet_player.png", "bullet_alien.png", "bullet_boss.png"
 
@@ -907,6 +954,7 @@ class Bullet(SWSprite):
         self.speed = speed
 
     "Движение огня"
+
     def update(self):
         self.move(0, self.speed if self.target == Player else -self.speed)
         if self.rect.bottom <= 0 or self.rect.top >= GameSettings.screen_height or \
@@ -915,6 +963,8 @@ class Bullet(SWSprite):
 
 
 "Класс, отвечающий за движение игрока и его стрельбу"
+
+
 class Player(SWSprite):
     health = 100
     image_names = "spaceX.png", "spaceX2.png", "spaceX3.png", "spaceX4.png"
@@ -940,6 +990,7 @@ class Player(SWSprite):
         self.shoot_cooldown = 0
 
     "Движение игрока"
+
     def update(self):
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= 1 * self.attack_speed
@@ -968,6 +1019,7 @@ class Player(SWSprite):
             self.move(*(d * speed for d in direction))
 
     "Стрельба игрока, взависимости от типа коробля"
+
     def shoot(self):
         if self.shoot_cooldown <= 0:
             if GameController.player_plain == 'spaceX.png':
@@ -995,8 +1047,9 @@ class Player(SWSprite):
 
 
 "Основная функция, которая отвечает за фоновую музыку, паузу, отрисовку разного рода информации"
-def main():
 
+
+def main():
     gc = GameController
     gs = GameSettings
 

@@ -4,8 +4,9 @@ import pygame.image as pg_image
 from pygame.mixer import Sound
 import sqlite3
 
-
 "Класс, отвечающий за обработку картинок, GIF картинок, баз данных и музыки"
+
+
 class FileManager:
     DATA_PATH = Path.cwd() / 'data'
 
@@ -71,6 +72,8 @@ class FileManager:
 
 
 "Класс, отвечающий за работу с музыкой, для дальнейшего удобного использования"
+
+
 class SoundManager:
     sounds: dict[str, Sound] = {}
     playing_loops: list[str] = []

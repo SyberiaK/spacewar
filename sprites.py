@@ -3,8 +3,9 @@ from pygame.sprite import Sprite, Group
 
 from managers import FileManager
 
-
 "Класс, для отрисовки в игре спрайтов"
+
+
 class SWSprite(Sprite):
     def __init__(self, image: str | Surface, *groups: Group):
         super().__init__(*groups)
@@ -47,6 +48,8 @@ class SWSprite(Sprite):
 
 
 "Класс, для отрисовки в игре картинки GIF"
+
+
 class AnimatedSprite(Sprite):
     def __init__(self, frames, *groups, frame_rate: int, update_rate: int):
         super().__init__(*groups)

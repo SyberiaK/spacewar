@@ -3,8 +3,9 @@ import pygame
 from typing import Tuple
 from sprites import SWSprite
 
-
 "Класс, для добавления на картинку текст и использование её в роле кнопки"
+
+
 class UIButton(SWSprite):
     def __init__(self, image: str | pygame.Surface, *groups,
                  text: str, font: pygame.font.Font, color: Tuple[int, int, int] = (0, 0, 0),
@@ -25,6 +26,8 @@ class UIButton(SWSprite):
 
 
 "Класс, для обработки вводимого ника"
+
+
 class TextInputBox(pygame.sprite.Sprite):
     def __init__(self, *groups, on_enter: callable):
         super().__init__(*groups)
@@ -62,4 +65,3 @@ class TextInputBox(pygame.sprite.Sprite):
                     else:
                         self.text += event.unicode
                     self.render_text()
-
